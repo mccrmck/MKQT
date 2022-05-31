@@ -1,6 +1,5 @@
 MKQTGUI {
 
-
 	// must fix all margins and spacing, as well as min/max width/height
 	// make focusColor consistent
 	// make fonts/font Sizes consistent
@@ -12,7 +11,7 @@ MKQTGUI {
 		var winW = 540, winH = 200;
 		var center = Window.availableBounds.center;
 		var bounds = Rect(center.x - (winW/2),center.y,winW,winH);
-		var win = Window("MKQT",bounds);
+		var win = Window("M.K.Q.T.",bounds);
 
 		var bigFont = Font(fontString, 28);
 		var titleFont = Font(fontString, 18);
@@ -114,7 +113,7 @@ MKQTGUI {
 
 		);
 
-		win.onClose_({ "does the startUpwindow need a close function?".postln });
+		win.onClose_({ "should the startUpwindow boot server onClose?".postln });
 		// win.background_(Color.rand(0.5,1));
 		win.drawFunc = {
 			// fill the gradient
@@ -129,7 +128,7 @@ MKQTGUI {
 		var winW = 500, winH = 200;
 		var center = Window.availableBounds.center;
 		var bounds = Rect(center.x - (winW/2),center.y,winW,winH);
-		var win = Window("MKQT TRAIN",bounds);
+		var win = Window("M.K.Q.T. TRAIN",bounds);
 
 		var bigFont = Font(fontString, 28);
 		var titleFont = Font(fontString, 18);
@@ -229,10 +228,12 @@ MKQTGUI {
 					Button()
 					.focusColor_(Color.clear)
 					.font_( Font(fontString, 13) )
-					.states_([[ "ADD",Color.black ]])
-					.mouseUpAction_({ |but| but.states_([[ "SAVE ",Color.black ]]) })
+					.states_([[ "SAVE",Color.black ]])
+					.mouseUpAction_({ |but| but.states_([[ "SAVE",Color.black ]]) })
 					.mouseDownAction_({ |but| but.states_([[ "SAVE",Color.red ]]) })
 					.action_({
+
+						"I think this should save a dataset \nand a labelset at the same time, right? \nAnd then they can be referenced together later?".postln
 
 					}),
 				)
@@ -253,7 +254,7 @@ MKQTGUI {
 		var winW = 450, winH = 650;
 		var center = Window.availableBounds.center;
 		var bounds = Rect(center.x - (winW/2),center.y - (winH/2),winW,winH);
-		var win = Window("MKQT PLAY",bounds);
+		var win = Window("M.K.Q.T. PLAY",bounds);
 
 		var fontString = "Kailasa";
 		var bigFont = Font(fontString, 28);
@@ -300,15 +301,43 @@ MKQTGUI {
 				.font_( subtitleFont )
 				.action_({
 					var folderPath = Platform.userExtensionDir +/+ "MKQT/dataSets/";
-					FileDialog({|path|
-						// check for file types? If .json.not, throw an error?
+					FileDialog({ |paths|
 
-						path.unbubble.postln;
+						// THIS BLOCK BECOMES A CLASS METHOD
+						// MKQT.makeDataAndLabelSets
+
+
+
+						// check for file types? If .json.not, throw an error?
+						var labelId = 0;
+
+						// what do I do if some of the names are the same???
+						// MLP is going to spit out label index number based on the order in which is gets a new label, must keep track of these!
+						var names = paths.collect({ |p,i| PathName(p).fileNameWithoutExtension });
+						var dSets = paths.collect({ |p,i| FluidDataSet(Server.default).read(p,{ "dataSet: % loaded".format(names[i]).postln }) });
+
+
+						//sort dSets based on file names? and then handle duplicates by merging them?
+
+						// build the labelSet
+						names.do({ |name,index|
+
+							dSets[index].size({|size|
+								size.do({ |i|
+									MKQT.mainLabelSet.addLabel(labelId,name.asString);
+									labelId = labelId + 1
+								});
+							})
+						});
+
+						// build the dataSet
+
+
 
 					},{},3,0,false,folderPath);
 				}),
 				Button()
-				.states_( [[ "TRAIN"]] )
+				.states_( [[ "FIT"]] )
 				.font_( subtitleFont )
 				.action_({ |but|
 
@@ -420,13 +449,12 @@ MKQTGUI {
 				),
 
 				HLayout(
-					[ StaticText().string_("2. SELECT MIDI DEVICE:").font_(subtitleFont).align_(\left), stretch: 0.5],
+					[ StaticText().string_("2. SELECT MIDI DEVICE:").font_(subtitleFont).align_(\left) ],
 					[ PopUpMenu()
 						.items_( MIDIClient.destinations.collect({ |m| m.device.asString }) )
 						.action_({ |menu|
 
-						}),
-						align: \right],
+					}) ],
 				),
 
 				HLayout(
@@ -467,7 +495,7 @@ MKQTGUI {
 					ezSlider.value("band dB",\db),
 					ezSlider.value("PC dB",\db),
 					ezSlider.value("PC activity",\unipolar),
-					ezSlider.value("PC activity",\unipolar),
+					ezSlider.value("",\unipolar),
 				)
 
 			).spacing_(9)

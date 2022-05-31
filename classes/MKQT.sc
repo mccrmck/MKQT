@@ -1,18 +1,28 @@
 MKQT {
 	classvar classifiers;
+	classvar <mainDataSet, <mainLabelSet;
 
 	*initClass {
 
 		classifiers = IdentityDictionary(); // all classifiers get added to this dictionary and saved?
 
+		ServerTree.add({ |server|                         // check if this makes sense...I think Cmd +. will make new instances, is that good/bad???
+			mainDataSet = FluidDataSet(server);
+			mainLabelSet = FluidLabelSet(server)},
+		\default
+		)
 	}
 
+	// necessary?
 	*new {
 		^super.new.init
 	}
 
-
+	// necessary?
 	init {}
+
+
+	/* ==== training methods ==== */
 
 	*liveTrain {
 		var coefs = 13;
@@ -38,12 +48,39 @@ MKQT {
 
 	}
 
+	/* ==== playing methods ==== */
+
+	*concatDataSets { |...dataSets|  // must be sorted by label/classifier first...which would be fileName in gui!
+		var zeroSet = dataSets[0];
+
+		dataSets[1..].do({ |dSet|
+			zeroSet.merge(dSet)
+		});
+		^mainDataSet = zeroSet
+	}
+
+
 }
+
+/* ==== naming convention ==== */
+
+/*
+(
+i = 0 ; //index
+c = "class";
+d = Date.getDate.format("%M%H%d%m%y");
+d = "%_".format(c) ++ d ++ i;
+d.postln;
+//
+d.split($_)[0]
+
+)
+*/
 
 /*
 
 GUI
--these buttons open separate windows (or layered Views?), each of which has a "back" button as well as a save button!
+-make save buttons visible when training is done!
 
 TRAIN
 
@@ -56,6 +93,9 @@ TRAIN
 -And can they also change the label retroactively? maybe add the data points to a dataset, then the save/add button executes filling a labelset (it's just ids and labels, time isn't important)
 
 -add classifier to .classifiers + save to the archive... maybe *initClass should populate the classifiers dict?
+
+-how do we associate synth behaviour with classifiers? Is that done manually during/after training? Is it absolute?
+
 
 -when does "fitting" happen?? should it fit automatically or only on user request?
 -automate fitting with a routine...can inform band that if they don't like how it's working they can 1. add more data 2. refit to get different results 3. Hire a new programmer??

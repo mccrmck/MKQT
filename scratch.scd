@@ -22,6 +22,9 @@ d.load(~dsdata);
 d.print;
 )
 
+~data.size
+
+.fromBuffer
 c = FluidLabelSet(s)
 d.getIds(c)
 c.print
@@ -34,7 +37,7 @@ y.size
 
 SynthDef(\trainMKQTmfcc,{
 	var coefs = \coefs.kr;
-	var sig = SoundIn.ar(\inBus.kr);
+	var sig = SoundIn.ar(\inBus.kr);x
 	var mfccs = FluidMFCC.kr(sig,coefs,40,1,maxNumCoeffs:coefs); // remove 0th coef
 	FluidKrToBuf.kr(mfccs,\bufnum.kr);
 	SendReply.kr(Impulse.kr(30),'/addPoints',mfccs);

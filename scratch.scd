@@ -16,12 +16,14 @@ d.getIds
 (
 //Make a dummy data set
 d = FluidDataSet(s);
-~data = Dictionary.with(*Array.iota(20).reshape(4,5).collect{|a,i| ("row"++i)->a});
+~data = Dictionary.with(*Array.iota(20).reshape(4,5).collect{|a,i| ("rock_"++i)->a});
 ~dsdata = Dictionary.newFrom([\cols,4,\data,~data]);
 d.load(~dsdata);
 d.print;
 )
 
+
+~ds.write("/Users/mikemccormick/Library/Application Support/SuperCollider/Extensions/MKQT/dataSets/rock.json")
 ~data.size
 
 .fromBuffer

@@ -1,10 +1,10 @@
 MKQT {
-	classvar classifiers;
-	classvar <mainDataSet, <mainLabelSet;
+	classvar <>classifiers;
+	classvar <>mainDataSet, <>mainLabelSet;
 
 	*initClass {
 
-		classifiers = IdentityDictionary(); // all classifiers get added to this dictionary and saved?
+		classifiers = List(); // all classifiers get added to this dictionary and saved?
 
 		ServerTree.add({ |server|                         // check if this makes sense...I think Cmd +. will make new instances, is that good/bad???
 			mainDataSet = FluidDataSet(server);
@@ -19,12 +19,12 @@ MKQT {
 	}
 
 	// necessary?
-	init {}
+	init {}                        // maybe I can make Server.default a class arg here? that would save some characters...
 
 
-	/* ==== training methods ==== */
+	/* ==== data collection ==== */
 
-	*liveTrain {
+	*liveData {
 		var coefs = 13;
 
 		Routine({
@@ -40,7 +40,7 @@ MKQT {
 
 	}
 
-	*bufTrain {
+	*bufData {
 
 		// things that have to happen here:
 		// store classifier name in classifiers Dict, eventually store dict in Archive...maybe write it immediately?
@@ -50,14 +50,43 @@ MKQT {
 
 	/* ==== playing methods ==== */
 
-	*concatDataSets { |...dataSets|  // must be sorted by label/classifier first...which would be fileName in gui!
+	*makeDataAndLabelSets { |paths| // array from GUI
+		var labelId = 0;
+		var names = paths.collect({ |p,i| PathName(p).fileNameWithoutExtension });    		// check for file types? If .json.not, throw an error?
+		var dSets = paths.collect({ |p,i| FluidDataSet(Server.default).read(p,{ "dataSet: % loaded".format(names[i]).postln }) });
+
+		names = names.collect({ |name| name.split($_)[0] });
+
+
+		//sort dSets based on file names? and then handle duplicates by merging them?
+
+		// build the labelSet
+		names.do({ |name,index|
+
+			classifiers.add(name.asSymbol);  // MLP is going to spit out label indexees based on the order it sees new labels, must keep track of these!
+
+			dSets[index].size({ |size|
+				size.do({ |i|
+					this.mainLabelSet.addLabel(labelId,name.asString);  // not sure I need "this"
+					labelId = labelId + 1
+				});
+			})
+		});
+
+		// build the dataSet
+		this.mainDataSet = this.concatDataSets(dSets) // not sure I need the first "this"
+	}
+
+	*concatDataSets { |dataSets|  // must be sorted by label/classifier first...which would be fileName in gui!
 		var zeroSet = dataSets[0];
 
 		dataSets[1..].do({ |dSet|
 			zeroSet.merge(dSet)
 		});
-		^mainDataSet = zeroSet
+		^zeroSet
 	}
+
+
 
 
 }
@@ -82,7 +111,7 @@ d.split($_)[0]
 GUI
 -make save buttons visible when training is done!
 
-TRAIN
+TRAIN         -- should this be changed to DATA instead of train?
 
 -band selects/inputs (via TextField) a mood/classifier they want to train, FluCoMa uses the string in Dataset Identifier
 -they must be able to add mulitple

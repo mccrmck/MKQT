@@ -18,7 +18,9 @@ MKQTGUI {
 		var subtitleFont = Font(fontString, 15);
 		var bgLeftGrad = Color.rand(0.3,1), bgRightGrad = Color.rand(0.3,1);
 
-		var inChanIndex = 0;
+		var janIn = 0;
+		var floIn = 0;
+		var karlIn = 0;
 		var outChanIndex = 0;
 		var sampleRate = 48000;
 
@@ -31,7 +33,7 @@ MKQTGUI {
 				StaticText().string_("1. SETUP").font_(titleFont),
 				HLayout(
 					VLayout(
-						StaticText().string_("inDevice").font_(subtitleFont).align_(\center),
+						StaticText().string_("input device").font_(subtitleFont).align_(\center),
 						PopUpMenu()
 						.font_( Font(fontString,13) )
 						.items_( ServerOptions.inDevices )
@@ -42,7 +44,7 @@ MKQTGUI {
 						}),
 					),
 					VLayout(
-						StaticText().string_("outDevice").font_(subtitleFont).align_(\center),
+						StaticText().string_("output device").font_(subtitleFont).align_(\center),
 						PopUpMenu()
 						.font_( Font(fontString,13) )
 						.items_( ServerOptions.outDevices )
@@ -51,19 +53,43 @@ MKQTGUI {
 							Server.default.options.outDevice = outD;
 							"new outDevice: %".format(outD).postln;
 						}),
-					),
+					)
+				),
+				HLayout(
 					VLayout(
-						StaticText().string_("ins").font_(subtitleFont).align_(\center),
-						PopUpMenu().items_( Array.fill(7,{|i| "% / %".format(i+1, i+2)}) )
+						StaticText().string_("Jan in").font_(subtitleFont).align_(\center),
+						PopUpMenu()
+						.items_( (1..8) )
 						.font_( Font(fontString,13) )
 						.action_({ |menu|
 							var index = menu.value;
-							inChanIndex = index;
+							janIn = index;
 						})
 					),
 					VLayout(
-						StaticText().string_("outs").font_(subtitleFont).align_(\center),
-						PopUpMenu().items_( Array.fill(7,{|i| "% / %".format(i+1, i+2)}) )
+						StaticText().string_("Florian in").font_(subtitleFont).align_(\center),
+						PopUpMenu()
+						.items_( (1..8) )
+						.font_( Font(fontString,13) )
+						.action_({ |menu|
+							var index = menu.value;
+							floIn = index;
+						})
+					),
+					VLayout(
+						StaticText().string_("Karl in").font_(subtitleFont).align_(\center),
+						PopUpMenu()
+						.items_( Array.fill(7,{|i| "% / %".format(i+1, i+2)}) )
+						.font_( Font(fontString,13) )
+						.action_({ |menu|
+							var index = menu.value;
+							karlIn = index;
+						})
+					),
+					VLayout(
+						StaticText().string_("master out").font_(subtitleFont).align_(\center),
+						PopUpMenu()
+						.items_( Array.fill(7,{|i| "% / %".format(i+1, i+2)}) )
 						.font_( Font(fontString,13) )
 						.action_({ |menu|
 							var index = menu.value;
@@ -71,8 +97,9 @@ MKQTGUI {
 						})
 					),
 					VLayout(
-						StaticText().string_("sampRate").font_(subtitleFont).align_(\center),
-						PopUpMenu().items_( ["44100","48000","88200","96000"] )
+						StaticText().string_("sample rate").font_(subtitleFont).align_(\center),
+						PopUpMenu()
+						.items_( ["44100","48000","88200","96000"] )
 						.font_( Font(fontString,13) )
 						.value_(1)
 						.action_({ |menu|
@@ -95,6 +122,9 @@ MKQTGUI {
 					.action_({ |but|
 
 						win.close;
+						// s.waitForBoot({});
+						// pass all the input busses
+						// do the sample rate/devices args get passed here before boot, or maybe just in the .action functions?
 						MKQTGUI.trainGUI
 
 					}),
@@ -105,8 +135,12 @@ MKQTGUI {
 					.mouseUpAction_({ |but| but.states_([[ "PLAY",Color.black ]]) })
 					.mouseDownAction_({ |but| but.states_([[ "PLAY",Color.red ]]) })
 					.action_({ |but|
+
 						win.close;
-						MKQTGUI.playGUI
+						// s.waitForBoot({});
+						// pass all the input busses
+						// do the sample rate/devices args get passed here before boot, or maybe just in the .action functions?
+						MKQTGUI.playGUI // pass input Args here?
 					}),
 				),
 			).spacing_(9)
@@ -114,9 +148,7 @@ MKQTGUI {
 		);
 
 		win.onClose_({ "should the startUpwindow boot server onClose?".postln });
-		// win.background_(Color.rand(0.5,1));
 		win.drawFunc = {
-			// fill the gradient
 			Pen.addRect(win.view.bounds);
 			Pen.fillAxialGradient(win.view.bounds.leftTop, win.view.bounds.rightBottom, bgLeftGrad, bgRightGrad);
 		};
@@ -125,7 +157,7 @@ MKQTGUI {
 	}
 
 	*trainGUI {
-		var winW = 500, winH = 200;
+		var winW = 540, winH = 200;
 		var center = Window.availableBounds.center;
 		var bounds = Rect(center.x - (winW/2),center.y,winW,winH);
 		var win = Window("M.K.Q.T. TRAIN",bounds);
@@ -135,8 +167,26 @@ MKQTGUI {
 		var subtitleFont = Font(fontString, 15);
 		var bgLeftGrad = Color.rand(0.3,1), bgRightGrad = Color.rand(0.3,1);
 
+		var backBut;
+
 		var stack, inputView, recordingView;
-		var rViewText, rViewButton;
+		var rViewText,rViewString, rViewButton, dataSet;
+
+		var saveStringView, saveString;
+
+		var spacer = { StaticText().string_("________").font_(subtitleFont).align_(\center) };
+
+		backBut = Button()
+		.focusColor_(Color.clear)
+		.font_( Font(fontString,13) )
+		.states_([[ "back",Color.black,Color.clear ]])
+		.mouseUpAction_({ |but| but.states_([[ "back",Color.black,Color.clear ]]) })
+		.mouseDownAction_({ |but| but.states_([[ "back",Color.red,Color.clear ]]) })
+		.action_({
+			win.close;
+			MKQTGUI.startGUI;
+		})
+		.maxWidth_(winW/3);
 
 		inputView = View(win).layout_(
 			HLayout(
@@ -145,63 +195,76 @@ MKQTGUI {
 				.focusColor_(Color.clear)
 				.font_( Font(fontString, 13) )
 				.states_( [[ "START",Color.black,Color.green(0.8)],["STOP",Color.black,Color.red(0.8)]] )
-				.action_({
-
-					"not implemented yet!!".warn
-
-				})
+				.action_({ "not implemented yet!!".warn })
 			).spacing_(9).margins_(0)
 		);
+
+		// train on recording
+
+		rViewText = TextField()
+		.action_({ |tField|
+			rViewString = tField.string;
+		});
 
 		rViewButton = Button()
 		.focusColor_( Color.clear )
 		.font_( Font(fontString, 13) )
 		.states_( [[ "START",Color.black,Color.green(0.8)],["STOP",Color.black,Color.red(0.8)]] )
-		.action_({
-			rViewText.postln;
+		.action_({ |but|
+			var val = but.value;
+
+			case
+			{val == 0}{
+				if(rViewString.size == 0,{ "data collection stopped \n\nhaha not really, Mike hasn't fixed this yet\n".postln })
+			}
+			{val == 1}{
+				rViewText.doAction;
+				if(rViewString.size == 0,{
+					"no path to file or folder\n".postln;
+				},{
+					dataSet = MKQT.dataFromBuffer(rViewString)
+				})
+			}
 		});
 
 		recordingView = View(win).layout_(
 			VLayout(
 				StaticText().string_("drag in a sound file or folder:").font_( Font(fontString,13) ),
 				HLayout(
-					TextField()
-					.action_({ |tField|
-						rViewText = tField.value;
-					}),
+					rViewText,
 					rViewButton,
 				),
 			).spacing_(4).margins_(0)
 		);
 
+		saveStringView = TextField()
+		.font_(subtitleFont)
+		.align_(\right)
+		.action_({ |text|
+			var string = text.string;
+			saveString = string;
+			"classifier: %\n".format(string).postln;
+		});
+
 		win.layout_(
 
 			VLayout(
-				HLayout(
-					StaticText().string_("Meat.Karaoke.Quality.Time").font_(bigFont).align_(\center)
-				),
+				StaticText().string_("Meat.Karaoke.Quality.Time").font_(bigFont).align_(\center),
 
 				HLayout(
-					[ Button()
-						.focusColor_(Color.clear)
-						.font_( Font(fontString,13) )
-						.states_([[ "back",Color.black,Color.clear ]])
-						.mouseUpAction_({ |but| but.states_([[ "back",Color.black,Color.clear ]]) })
-						.mouseDownAction_({ |but| but.states_([[ "back",Color.red,Color.clear ]]) })
-						.action_({
-							win.close;
-							MKQTGUI.startGUI;
+					[ backBut, align: \left ],
+					[ StaticText().string_("TRAIN").font_(titleFont), align: \center ],
+					winW * 0.3
 
-					}), align: \left]
-				).spacing_(0),
+				).spacing_(0).margins_(0),
 
-				HLayout( StaticText().string_("________").font_(subtitleFont).align_(\center) ),
+				spacer.(),
 
 				VLayout(
 					HLayout(
 						[ StaticText().string_("1. CHOOSE MODE:").font_(subtitleFont).align_(\left), stretch: 0.1 ],
 						PopUpMenu()
-						.items_(["train on recording","train on live input"])
+						.items_(["analyze recording","analyze live input"])
 						.action_({ |menu|
 							stack.index = menu.value;
 						}),
@@ -212,20 +275,14 @@ MKQTGUI {
 					)
 				),
 
-				StaticText().string_("________").font_(subtitleFont).align_(\center),
+				spacer.(),
 
 				HLayout(
 					[ StaticText().string_("2. ENTER ONE-WORD CLASSIFIER:").font_(subtitleFont).align_(\left), stretch: 0.6],
-					[ TextField()
-						.font_(subtitleFont)
-						.align_(\right)
-						.action_({ |text|
-							var string = text.string;
-							"classifier: %".format(string).postln;
-					}),stretch: 0.4]
+					[ saveStringView ,stretch: 0.4]
 				),
 
-				StaticText().string_("________").font_(subtitleFont).align_(\center),
+				spacer.(),
 
 				HLayout(
 					[ StaticText().string_("3. SAVE DATASET:").font_(subtitleFont).align_(\left), stretch: 0.5],
@@ -236,42 +293,67 @@ MKQTGUI {
 					.mouseUpAction_({ |but| but.states_([[ "SAVE",Color.black ]]) })
 					.mouseDownAction_({ |but| but.states_([[ "SAVE",Color.red ]]) })
 					.action_({
-
-						"I think this should save a dataset \nand a labelset at the same time, right? \nAnd then they can be referenced together later?".postln
-
+						saveStringView.doAction;
+						case
+						{ saveString.size == 0 }{ "please enter a one-word classifier\n".postln }
+						{ dataSet.isNil }{ "must analyze audio before saving!\n".postln }
+						{
+							var folderPath = Platform.userExtensionDir +/+ "MKQT/dataSets/";
+							var date = Date.getDate.format("%M%H%d%m%y");
+							var string = "%_".format(saveString) ++ date;
+							FileDialog({ |path|
+								Routine({
+									dataSet.write(path.unbubble,{ "dataset: % saved".format(string).postln });
+									win.close;
+									MKQTGUI.startGUI;
+								}).play(AppClock)
+							},{
+								"dataset: % not saved".format(string).postln;
+							},1,1,false,folderPath +/+ "%.json".format(string) );
+						};
 					}),
 				)
 			).spacing_(9)
 		);
 
-		// win.background_(Color.rand(0.5,1));
 		win.drawFunc = {
-			// fill the gradient
 			Pen.addRect(win.view.bounds);
 			Pen.fillAxialGradient(win.view.bounds.leftTop, win.view.bounds.rightBottom, bgLeftGrad, bgRightGrad);
 		};
-		// win.refresh;
 		win.front;
 	}
 
 	*playGUI {
-		var winW = 450, winH = 650;
+		var winW = 540, winH = 650;
 		var center = Window.availableBounds.center;
 		var bounds = Rect(center.x - (winW/2),center.y - (winH/2),winW,winH);
 		var win = Window("M.K.Q.T. PLAY",bounds);
 
-		var fontString = "Kailasa";
 		var bigFont = Font(fontString, 28);
 		var titleFont = Font(fontString, 18);
 		var subtitleFont = Font(fontString, 15);
 		var bgLeftGrad = Color.rand(0.3,1), bgRightGrad = Color.rand(0.3,1);
+
+		var backBut;
 
 		var loadStack, newLoadView, oldLoadView = View(win);
 		var playStack, oldPlayView, newPlayView;
 
 		var ezSlider;
 
-		var waitBeforeStart = 0;
+		var performanceLength = 34, waitBeforeStart = 0;
+
+		backBut = Button()
+		.focusColor_(Color.clear)
+		.font_( Font(fontString,13) )
+		.states_([[ "back",Color.black,Color.clear ]])
+		.mouseUpAction_({ |but| but.states_([[ "back",Color.black,Color.clear ]]) })
+		.mouseDownAction_({ |but| but.states_([[ "back",Color.red,Color.clear ]]) })
+		.action_({
+			win.close;
+			MKQTGUI.startGUI;
+
+		});
 
 		oldLoadView.layout_(
 			HLayout(
@@ -291,7 +373,6 @@ MKQTGUI {
 								.string_( PathName(path.unbubble).fileNameWithoutExtension )
 								.align_(\right)
 							)
-
 						},{},1,0,false,folderPath);
 				}) ],
 			).spacing_(9).margins_(0)
@@ -360,7 +441,7 @@ MKQTGUI {
 			).spacing_(9).margins_(0),
 		);
 
-		ezSlider = { |string, specKey|
+		ezSlider = { |string, specKey, actionFunc|
 			var text = StaticText();
 			var slider = Slider();
 			var numBox = NumberBox();
@@ -375,7 +456,7 @@ MKQTGUI {
 				.action_({ |slider|
 					var val = slider.value;
 					numBox.value = specKey.asSpec.map(val).round(0.1);
-
+					actionFunc.value
 				})
 				.valueAction_(0),
 
@@ -386,28 +467,19 @@ MKQTGUI {
 					var val = box.value;
 					slider.value = specKey.asSpec.unmap(val);
 				})
-			).margins_(9)
+			).margins_(5)
 		};
 
 		win.layout_(
 
 			VLayout(
-				HLayout(
-					StaticText().string_("Meat.Karaoke.Quality.Time").font_(bigFont).align_(\center)
-				),
+				StaticText().string_("Meat.Karaoke.Quality.Time").font_(bigFont).align_(\center),
 
 				HLayout(
-					[ Button()
-						.focusColor_(Color.clear)
-						.font_( Font(fontString,13) )
-						.states_([[ "back",Color.black,Color.clear ]])
-						.mouseUpAction_({ |but| but.states_([[ "back",Color.black,Color.clear ]]) })
-						.mouseDownAction_({ |but| but.states_([[ "back",Color.red,Color.clear ]]) })
-						.action_({
-							win.close;
-							MKQTGUI.startGUI;
+					[ backBut, align: \left ],
 
-					}), align: \left]
+					StaticText().string_("PLAY").font_(titleFont),
+					backBut.bounds.width
 
 				).spacing_(0),
 
@@ -417,7 +489,7 @@ MKQTGUI {
 						.items_(Array.fib(6,3,5))
 						.value_(4)
 						.action_({ |menu|
-
+							performanceLength = menu.value;
 						}),
 						align: \center],
 					[ StaticText().string_("MINUTES").font_(subtitleFont).align_(\left)],
@@ -466,19 +538,18 @@ MKQTGUI {
 					)
 				).spacing_(9),
 
-				HLayout(
-					ezSlider.value("band dB",\db),
+				HLayout(                                         // these need actionFuncs!!
+					ezSlider.value("Jan dB",\db),
+					ezSlider.value("Flo dB",\db),
+					ezSlider.value("Karl dB",\db),
 					ezSlider.value("PC dB",\db),
-					ezSlider.value("PC activity",\unipolar),
-					ezSlider.value("",\unipolar),
+					ezSlider.value("PC mix",\unipolar),
 				)
 
 			).spacing_(9)
 		);
 
-		// win.background_(Color.rand(0.5,1));
 		win.drawFunc = {
-			// fill the gradient
 			Pen.addRect(win.view.bounds);
 			Pen.fillAxialGradient(win.view.bounds.leftTop, win.view.bounds.rightBottom, bgLeftGrad, bgRightGrad);
 		};

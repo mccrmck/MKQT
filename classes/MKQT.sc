@@ -1,6 +1,7 @@
 MKQT {
 	classvar <>classifiers;
 	classvar <>mainDataSet, <>mainLabelSet;
+	classvar <janIn, <floIn, <karlIn, <mstrOut;
 
 	*initClass {
 
@@ -14,38 +15,108 @@ MKQT {
 	}
 
 	// necessary?
-	*new {
-		^super.new.init
+	*new { |janIn, floIn, karlIn, mstrOut|
+		^super.new.init(janIn, floIn, karlIn, mstrOut)
 	}
 
 	// necessary?
-	init {}                        // maybe I can make Server.default a class arg here? that would save some characters...
+	init { |janIn_, floIn_, karlIn_, mstrOut_|             // maybe I can make Server.default a class arg here? that would save some characters...
+
+		janIn = janIn_;
+		floIn = floIn_;
+		karlIn = karlIn_;
+		mstrOut = mstrOut_;
+
+
+
+	}
 
 
 	/* ==== data collection ==== */
 
-	*liveData {
-		var coefs = 13;
+	*dataFromLiveInput {}
+
+	*dataFromBuffer { |pathString, plotAnal = false|
+
+		var server = Server.default;                                        // another server instance
+		var path = PathName(pathString);
+		var loader = FluidLoadFolder(path);
+
+		// buffers
+		var buffer, monoBuf;
+		var indicesBuf  = Buffer(server);
+		var featuresBuf = Buffer(server);                           // a buffer for writing the analyses into
+		var statsBuf    = Buffer(server);                           // a buffer for writing the statistical summary of the analyses into
+		var flatBuf     = Buffer(server);                           // a buffer for writing the mean MFCC values into
+
+		var dataset     = FluidDataSet(server);
 
 		Routine({
-			SynthDef(\trainMKQTLive,{
-				var sig = SoundIn.ar(\inBus.kr);
-				var mfccs = FluidMFCC.kr(sig,coefs,40,1,maxNumCoeffs:coefs); // remove 0th coef, 13 total (1-13)
-				FluidKrToBuf.kr(mfccs,\bufnum.kr);
-				SendReply.kr(Impulse.kr(30),'/addPoints',mfccs);
-			}).add;
 
-		}).play
-		// maxNumCoeffs must be declared when Synth is added - consider making a factory? Or setting a hi max? Or just using a fixed number?
+			//  buffer
+			case
+			{path.isFile}{ buffer = Buffer.read(server,pathString) }
+			{path.isFolder}{ loader.play(server,{ buffer = loader.buffer }) };
 
-	}
+			server.sync;
 
-	*bufData {
+			// make mono
+			case
+			{ buffer.numChannels == 1 }{ monoBuf = buffer}
+			{ buffer.numChannels == 2 }{
+				monoBuf = Buffer(server);
+				FluidBufCompose.processBlocking(server,buffer,startChan: 0,numChans: 1,gain: -3.dbamp,destination: monoBuf,destGain: 1);
+				FluidBufCompose.processBlocking(server,buffer,startChan: 0,numChans: 1,gain: -3.dbamp,destination: monoBuf,destGain: 1);
+			}
+			{ buffer.numChannels > 2 }{ "multichannel file input not implemented yet - remind Mike".warn };
 
-		// things that have to happen here:
-		// store classifier name in classifiers Dict, eventually store dict in Archive...maybe write it immediately?
+			server.sync;
 
+			// reduce/remove silences - these numbers are based on 48k but could/should be scaled to reflect sampleRate!
+			FluidBufAmpGate.processBlocking(server,monoBuf,
+				indices: indicesBuf,
+				rampUp: 30,                 // The number of samples the envelope follower will take to reach the next value when raising.
+				rampDown: 1200,             // The number of samples the envelope follower will take to reach the next value when falling.
+				onThreshold: -18,           // The threshold in dB of the envelope follower to trigger an onset, aka to go ON when in OFF state.
+				offThreshold: -32,          // The threshold in dB of the envelope follower to trigger an offset, , aka to go OFF when in ON state.
+				minLengthAbove: 480,        // The length in samples that the envelope have to be above the threshold to consider it a valid transition to ON.
+				minLengthBelow: 480,        // The length in samples that the envelope have to be below the threshold to consider it a valid transition to OFF.
+				lookBack: 480,
+				lookAhead: 480,
+				action:{ if(plotAnal,{ FluidWaveform(monoBuf, indicesBuf) }) }
+			);
 
+			server.sync;
+
+			indicesBuf.loadToFloatArray(action:{ |sliceArray|
+
+				sliceArray.pairsDo({ |startFrame, endFrame, sliceIndex|
+					var numFrames = endFrame - startFrame;
+					sliceIndex = (sliceIndex / 2).asInteger;
+
+					"analyzing slice: % / %".format(sliceIndex,(sliceArray.size / 2 - 1).asInteger).postln;
+
+					FluidBufSpectralShape.processBlocking(server,monoBuf,startFrame, numFrames,features: featuresBuf, minFreq: 20); // featuresBuf = many frames, 7 chans(descriptors)
+
+					// consider adding weights here...from an FluidBufLoudness maybe?
+					FluidBufStats.processBlocking(server,featuresBuf,stats: statsBuf);                       // statsBuf = 49 frames, 7 chans
+
+					// FluidBufCompose.processBlocking() // is it possible to fill the flatBuf with spectralShape ++ stats? Does that make sense?
+
+					FluidBufFlatten.processBlocking(server,statsBuf,numFrames: 2,destination: flatBuf);      // flatBuf = 14 frames, 1 chan
+
+					dataset.addPoint("%-%".format(Date.getDate.format("%M%H%d%m%y"),sliceIndex),flatBuf);    // does this work?
+					server.sync;
+				});
+			});
+
+			[ buffer, monoBuf, indicesBuf, featuresBuf, statsBuf, flatBuf ].do(_.free);
+
+			"\nanalysis done\n".postln
+
+		}).play;
+
+		^dataset
 	}
 
 	/* ==== playing methods ==== */
@@ -59,6 +130,8 @@ MKQT {
 
 
 		//sort dSets based on file names? and then handle duplicates by merging them?
+		// dSets = this.removeDataSetDoubles;
+
 
 		// build the labelSet
 		names.do({ |name,index|
@@ -87,8 +160,6 @@ MKQT {
 	}
 
 
-
-
 }
 
 /* ==== naming convention ==== */
@@ -114,7 +185,6 @@ GUI
 TRAIN         -- should this be changed to DATA instead of train?
 
 -band selects/inputs (via TextField) a mood/classifier they want to train, FluCoMa uses the string in Dataset Identifier
--they must be able to add mulitple
 -must have dedicated start and stop buttons that end data point entry...should also be gated by Loudness
 
 -be able to write dataSet to json file - must have a big SAVE button! (should they also have the option to clear the archive/start clean?)

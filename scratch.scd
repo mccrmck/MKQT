@@ -1,18 +1,5 @@
 
 
-~coefs = 13;
-
-~pointCount = 0;
-
-~mfccBuf = Buffer.alloc(s,~coefs);
-~dataSet = FluidDataSet(s);
-~labelSet = FluidLabelSet(s);
-
-
-y = FluidLabelSet(s);
-
-d.getIds
-
 (
 //Make a dummy data set
 d = FluidDataSet(s);
@@ -35,34 +22,11 @@ y.print
 d.getIds(y).print
 y.size
 
-// this will of course have another inSynth before where it can send to both the trainer and the predicter via \sendBus.kr
-
-SynthDef(\trainMKQTmfcc,{
-	var coefs = \coefs.kr;
-	var sig = SoundIn.ar(\inBus.kr);x
-	var mfccs = FluidMFCC.kr(sig,coefs,40,1,maxNumCoeffs:coefs); // remove 0th coef
-	FluidKrToBuf.kr(mfccs,\bufnum.kr);
-	SendReply.kr(Impulse.kr(30),'/addPoints',mfccs);
-}).add
-
-
-
-OSCdef(\addPoints,{ |msg, time, addr, recvPort|
-	var label = "chill";                                 // must be able to pass this!!
-	var id = "%_%".format(label,~pointCount);         // id could probably just be an integer
-	~dataSet.addPoint(id,~mfccBuf);
-	~labelSet.addLabel(id,label);
-	~pointCount = ~pointCount + 1;
-},'/addPoints')
-
-// IMPORTANT - labels get an index in the labelSet Dictionary, so I must be able to store these indexes somewhere for future recall!!
-// make use of Archive.global for saving these values!!
-
 
 ~mlpclassifier = FluidMLPClassifier(s,[5],1,learnRate:0.05,batchSize:5,validation:0.1);
 
 
-//automate this: while loss > 0.01,{fit} or whatever
+// automate this: while loss > 0.01,{fit} or whatever
 // change these throughout the process if necessary!
 ~mlpclassifier.learnRate = 0.03;
 ~mlpclassifier.momentum = 0;
@@ -86,68 +50,43 @@ OSCdef(\addPoints,{ |msg, time, addr, recvPort|
 	Silent.ar;
 }
 
-FluidBufToKr
-
-SynthDef(\predictMKQT,{
-	var coefs = \coefs.kr;
-	var trig = Impulse.kr(5); // can make into an Arg later on..
-	var inBuf = LocalBuf(coefs);
+(
+SynthDef(\mkqtPredict,{
+	var trig = Impulse.kr(5); // can make into an Arg later on...?
+	var statsBuf = LocalBuf(14);
 	var outBuf = LocalBuf(1);
-	var sig = SoundIn.ar(\inBus.kr);
-	sig = FluidMFCC.kr(sig,coefs,40,1,maxNumCoeffs:coefs); // remove 0th coef
-	FluidKrToBuf.kr(sig,inBuf);
-	~mlpclassifier.kr(trig, inBuf, outBuf); // has to be the same instance as earlier!! Also, I think this will output one point that has to be referenced with the indexes of the LabelSet ids!!
+	var sig = SoundIn.ar(\inBus.kr(0));
+	sig = FluidSpectralShape.kr(sig, minFreq: 20);
+	sig = FluidStats.kr(sig,20); // should experiment with history window size!!
 
+
+	FluidKrToBuf.kr(sig,statsBuf); // must check what kind of buffer this outputs... 14 frames/1 chan, or 1 frame/14 chans???
+	statsBuf.numChannels.postln;
+	// ~mlpclassifier.kr(trig, statsBuf, outBuf); // has to be the same instance that was trained!!
+	sig = FluidBufToKr.kr(outBuf);
+
+	// SendReply.kr(trig,'/needs/address',[ sig ])
 
 }).add
+)
+
+
+SynthDef(\test,{
+	var sig = LFSaw.kr();
+	FluidStats.kr(sig,20);
+}).send
+
+Synth(\test)
+
+.send
+
+{FluidStats.kr(SinOsc.ar(),20)}.play
 
 
 
-// archive
-// can't archive a DataSet - WARNING: cannot archive open Functions
-
-
-d = FluidDataSet(s);
-b = Buffer.alloc(s,4)
-
-b.setn(0, { rrand(0.0, 1.0) }!4);
-b.getn(0,4, {|msg| msg.postln});
-
-fork{
-
-	3.do({ |i|
-		var rand = { rrand(0.0, 1.0) }!4;
-		rand.postln;
-		b.setn(0, rand);
-		d.addPoint(i,b,{("addPoint"+i).postln});
-		s.sync
-	})
-}
-
-d.print
-d.dump
-
-c
-d.print
-
-x = Buffer.loadCollection(s,{2.0.rand}!4)
-x.setn(0,{2.0.rand}!4)
-a.predictPoint(x,{|i| i.postln})
-
-a = FluidMLPClassifier(s,[5],1,learnRate:0.05,batchSize:5,validation:0.1);
-a.dump({|dict| dict["labels"].postln})
-a.dump({|dict| dict["mlp"].keys.postln})
-
-a.read("/Users/mikemccormick/Dropbox/Mac/Desktop/mlp.json")
-
-
-a.fit(d,c,{
-	arg loss;
-	loss.postln;
-});
-
-~globalDict = Dictionary()
-
-~globalDict.put(\test,~mlpclassifier)
-Archive.global.put(\mqt,~globalDict)
-Archive.global[\mqt][\test]
+Ndef(\test,{
+	var sig = LFSaw.ar();
+	// sig.postln;
+	FluidStats.kr(sig,20);
+	sig * 0.001
+}).play

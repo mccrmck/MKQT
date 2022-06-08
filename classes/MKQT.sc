@@ -1,7 +1,9 @@
 MKQT {
 	classvar <>classifiers;
-	classvar <>mainDataSet, <>mainLabelSet;
-	classvar <janIn, <floIn, <karlIn, <mstrOut;
+	classvar <>mainDataSet, <>mainLabelSet, <>mlp;
+	classvar <janIn, <floIn, <karlIn, <mstrOut, <server;
+
+	classvar <>classifierIndex, <>prob;
 
 	*initClass {
 
@@ -9,28 +11,28 @@ MKQT {
 
 		ServerTree.add({ |server|                         // check if this makes sense...I think Cmd +. will make new instances, is that good/bad???
 			mainDataSet = FluidDataSet(server);
-			mainLabelSet = FluidLabelSet(server)},
+			mainLabelSet = FluidLabelSet(server);
+			mlp = FluidMLPClassifier(server) },
 		\default
 		)
 	}
 
 	// necessary?
-	*new { |janIn, floIn, karlIn, mstrOut|
-		^super.new.init(janIn, floIn, karlIn, mstrOut)
+	*new { |janIn, floIn, karlIn, mstrOut, server|
+		^super.new.init(janIn, floIn, karlIn, mstrOut, server)
 	}
 
 	// necessary?
-	init { |janIn_, floIn_, karlIn_, mstrOut_|             // maybe I can make Server.default a class arg here? that would save some characters...
+	init { |janIn_, floIn_, karlIn_, mstrOut_,server_|             // maybe I can make Server.default a class arg here? that would save some characters...
 
 		janIn = janIn_;
 		floIn = floIn_;
 		karlIn = karlIn_;
 		mstrOut = mstrOut_;
 
-
+		server = server_ ? Server.default;
 
 	}
-
 
 	/* ==== data collection ==== */
 
@@ -38,7 +40,6 @@ MKQT {
 
 	*dataFromBuffer { |pathString, plotAnal = false|
 
-		var server = Server.default;                                        // another server instance
 		var path = PathName(pathString);
 		var loader = FluidLoadFolder(path);
 
@@ -75,10 +76,13 @@ MKQT {
 			// reduce/remove silences - these numbers are based on 48k but could/should be scaled to reflect sampleRate!
 			FluidBufAmpGate.processBlocking(server,monoBuf,
 				indices: indicesBuf,
-				rampUp: 30,                 // The number of samples the envelope follower will take to reach the next value when raising.
-				rampDown: 1200,             // The number of samples the envelope follower will take to reach the next value when falling.
-				onThreshold: -18,           // The threshold in dB of the envelope follower to trigger an onset, aka to go ON when in OFF state.
-				offThreshold: -32,          // The threshold in dB of the envelope follower to trigger an offset, , aka to go OFF when in ON state.
+				rampUp: 48,                 // The number of samples the envelope follower will take to reach the next value when raising.
+				rampDown: 48,             // The number of samples the envelope follower will take to reach the next value when falling.
+
+				// do these two possibly get passed into the function as args?
+				onThreshold: -6,           // The threshold in dB of the envelope follower to trigger an onset, aka to go ON when in OFF state.
+				offThreshold: -8,          // The threshold in dB of the envelope follower to trigger an offset, , aka to go OFF when in ON state.
+
 				minLengthAbove: 480,        // The length in samples that the envelope have to be above the threshold to consider it a valid transition to ON.
 				minLengthBelow: 480,        // The length in samples that the envelope have to be below the threshold to consider it a valid transition to OFF.
 				lookBack: 480,
@@ -101,7 +105,7 @@ MKQT {
 					// consider adding weights here...from an FluidBufLoudness maybe?
 					FluidBufStats.processBlocking(server,featuresBuf,stats: statsBuf);                       // statsBuf = 49 frames, 7 chans
 
-					// FluidBufCompose.processBlocking() // is it possible to fill the flatBuf with spectralShape ++ stats? Does that make sense?
+					// FluidBufCompose.processBlocking()                                                     // possible/useeful to send spectralShape ++ stats for BufFlatten?
 
 					FluidBufFlatten.processBlocking(server,statsBuf,numFrames: 2,destination: flatBuf);      // flatBuf = 14 frames, 1 chan
 
@@ -124,7 +128,7 @@ MKQT {
 	*makeDataAndLabelSets { |paths| // array from GUI
 		var labelId = 0;
 		var names = paths.collect({ |p,i| PathName(p).fileNameWithoutExtension });    		// check for file types? If .json.not, throw an error?
-		var dSets = paths.collect({ |p,i| FluidDataSet(Server.default).read(p,{ "dataSet: % loaded".format(names[i]).postln }) });
+		var dSets = paths.collect({ |p,i| FluidDataSet(server).read(p,{ "dataSet: % loaded".format(names[i]).postln }) });
 
 		names = names.collect({ |name| name.split($_)[0] });
 
@@ -159,56 +163,34 @@ MKQT {
 		^zeroSet
 	}
 
+	*train {
+		var dataBool, labelBool;
+
+		mainDataSet.size({ |size| dataBool = size > 0});
+		mainLabelSet.size({ |size| labelBool = size > 0 });
+
+		if(dataBool and: { labelBool },{
+			mlp.fit( mainDataSet, mainLabelSet,{ |loss|
+				loss.postln;
+			});
+		},{
+			"data: % or labels: % not loaded".format(dataBool, labelBool).postln;
+		})
+	}
+
+
+	*fillSynthLib {
+
+		classifiers.do({ |class|
+
+		});
+
+	}
+
+	*startPerformance { |performanceDur|
+
+	}
+
+
 
 }
-
-/* ==== naming convention ==== */
-
-/*
-(
-i = 0 ; //index
-c = "class";
-d = Date.getDate.format("%M%H%d%m%y");
-d = "%_".format(c) ++ d ++ i;
-d.postln;
-//
-d.split($_)[0]
-
-)
-*/
-
-/*
-
-GUI
--make save buttons visible when training is done!
-
-TRAIN         -- should this be changed to DATA instead of train?
-
--band selects/inputs (via TextField) a mood/classifier they want to train, FluCoMa uses the string in Dataset Identifier
--must have dedicated start and stop buttons that end data point entry...should also be gated by Loudness
-
--be able to write dataSet to json file - must have a big SAVE button! (should they also have the option to clear the archive/start clean?)
--before/instead of SAVE button, maybe there should be an ADD TO DATASET button...in case they record something and then decide afterwards it was trash?
--And can they also change the label retroactively? maybe add the data points to a dataset, then the save/add button executes filling a labelset (it's just ids and labels, time isn't important)
-
--add classifier to .classifiers + save to the archive... maybe *initClass should populate the classifiers dict?
-
--how do we associate synth behaviour with classifiers? Is that done manually during/after training? Is it absolute?
-
-
--when does "fitting" happen?? should it fit automatically or only on user request?
--automate fitting with a routine...can inform band that if they don't like how it's working they can 1. add more data 2. refit to get different results 3. Hire a new programmer??
-
-
-PLAY
--check
--should have feedback button (map to spacebar?) that adds a point to dataset
--timed sections, change instruments/intensity/aesthetics
-
--there needs to be a wet/dry control...is this just a \freq control for the analysis SendReply?
-
--MLPClassifier runs at .kr and tries to classify behaviour based on available choices... must have some filtering (sample and hold?) to ensure longer phrases and not wild switching
--switch statement a la EIDOLON makes decisions about what kind of processing happens.
-
-
-*/

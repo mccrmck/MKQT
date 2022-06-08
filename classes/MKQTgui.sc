@@ -19,8 +19,8 @@ MKQTGUI {
 		var bgLeftGrad = Color.rand(0.3,1), bgRightGrad = Color.rand(0.3,1);
 
 		var janIn = 0;
-		var floIn = 0;
-		var karlIn = 0;
+		var floIn = 1;
+		var karlIn = 2;
 		var outChanIndex = 0;
 		var sampleRate = 48000;
 
@@ -65,6 +65,7 @@ MKQTGUI {
 							var index = menu.value;
 							janIn = index;
 						})
+						.value_(janIn)
 					),
 					VLayout(
 						StaticText().string_("Florian in").font_(subtitleFont).align_(\center),
@@ -75,6 +76,7 @@ MKQTGUI {
 							var index = menu.value;
 							floIn = index;
 						})
+						.value_(floIn)
 					),
 					VLayout(
 						StaticText().string_("Karl in").font_(subtitleFont).align_(\center),
@@ -85,6 +87,7 @@ MKQTGUI {
 							var index = menu.value;
 							karlIn = index;
 						})
+						.value_(karlIn)
 					),
 					VLayout(
 						StaticText().string_("master out").font_(subtitleFont).align_(\center),
@@ -95,6 +98,7 @@ MKQTGUI {
 							var index = menu.value;
 							outChanIndex = index;
 						})
+						.value_(outChanIndex)
 					),
 					VLayout(
 						StaticText().string_("sample rate").font_(subtitleFont).align_(\center),
@@ -122,11 +126,10 @@ MKQTGUI {
 					.action_({ |but|
 
 						win.close;
-						// s.waitForBoot({});
-						// pass all the input busses
-						// do the sample rate/devices args get passed here before boot, or maybe just in the .action functions?
-						MKQTGUI.trainGUI
-
+						Server.default.waitForBoot({
+							MKQT(janIn,floIn,karlIn,outChanIndex);
+							MKQTGUI.trainGUI
+						});
 					}),
 					Button()
 					.string_("PLAY")
@@ -137,10 +140,10 @@ MKQTGUI {
 					.action_({ |but|
 
 						win.close;
-						// s.waitForBoot({});
-						// pass all the input busses
-						// do the sample rate/devices args get passed here before boot, or maybe just in the .action functions?
-						MKQTGUI.playGUI // pass input Args here?
+						Server.default.waitForBoot({
+							MKQT(janIn,floIn,karlIn,outChanIndex);
+							MKQTGUI.playGUI // pass input Args here?
+						});
 					}),
 				),
 			).spacing_(9)
@@ -167,16 +170,7 @@ MKQTGUI {
 		var subtitleFont = Font(fontString, 15);
 		var bgLeftGrad = Color.rand(0.3,1), bgRightGrad = Color.rand(0.3,1);
 
-		var backBut;
-
-		var stack, inputView, recordingView;
-		var rViewText,rViewString, rViewButton, dataSet;
-
-		var saveStringView, saveString;
-
-		var spacer = { StaticText().string_("________").font_(subtitleFont).align_(\center) };
-
-		backBut = Button()
+		var backBut = Button()
 		.focusColor_(Color.clear)
 		.font_( Font(fontString,13) )
 		.states_([[ "back",Color.black,Color.clear ]])
@@ -188,7 +182,14 @@ MKQTGUI {
 		})
 		.maxWidth_(winW/3);
 
-		inputView = View(win).layout_(
+		var stack;
+		var rViewString, dataSet;
+
+		var saveString;
+
+		var spacer = { StaticText().string_("________").font_(subtitleFont).align_(\center) };
+
+		var	inputView = View(win).layout_(
 			HLayout(
 				[ StaticText().string_("press play when ready, remember to press stop when done!").font_( Font(fontString,13) ),stretch: 0.5],
 				Button()
@@ -201,12 +202,12 @@ MKQTGUI {
 
 		// train on recording
 
-		rViewText = TextField()
+		var rViewText = TextField()
 		.action_({ |tField|
 			rViewString = tField.string;
 		});
 
-		rViewButton = Button()
+		var rViewButton = Button()
 		.focusColor_( Color.clear )
 		.font_( Font(fontString, 13) )
 		.states_( [[ "START",Color.black,Color.green(0.8)],["STOP",Color.black,Color.red(0.8)]] )
@@ -227,7 +228,7 @@ MKQTGUI {
 			}
 		});
 
-		recordingView = View(win).layout_(
+		var recordingView = View(win).layout_(
 			VLayout(
 				StaticText().string_("drag in a sound file or folder:").font_( Font(fontString,13) ),
 				HLayout(
@@ -237,7 +238,7 @@ MKQTGUI {
 			).spacing_(4).margins_(0)
 		);
 
-		saveStringView = TextField()
+		var saveStringView = TextField()
 		.font_(subtitleFont)
 		.align_(\right)
 		.action_({ |text|
@@ -334,16 +335,7 @@ MKQTGUI {
 		var subtitleFont = Font(fontString, 15);
 		var bgLeftGrad = Color.rand(0.3,1), bgRightGrad = Color.rand(0.3,1);
 
-		var backBut;
-
-		var loadStack, newLoadView, oldLoadView = View(win);
-		var playStack, oldPlayView, newPlayView;
-
-		var ezSlider;
-
-		var performanceLength = 34, waitBeforeStart = 0;
-
-		backBut = Button()
+		var backBut =  Button()
 		.focusColor_(Color.clear)
 		.font_( Font(fontString,13) )
 		.states_([[ "back",Color.black,Color.clear ]])
@@ -352,8 +344,41 @@ MKQTGUI {
 		.action_({
 			win.close;
 			MKQTGUI.startGUI;
-
 		});
+
+		var ezSlider = { |string, specKey, actionFunc|
+			var text = StaticText();
+			var slider = Slider();
+			var numBox = NumberBox();
+
+			VLayout(
+				text
+				.string_(string)
+				.font_( subtitleFont )
+				.align_(\center),
+
+				slider
+				.action_({ |slider|
+					var val = slider.value;
+					numBox.value = specKey.asSpec.map(val).round(0.01);
+					actionFunc.value(val)
+				})
+				.valueAction_(0),
+
+				numBox
+				.font_( subtitleFont )
+				.align_(\center)
+				.action_({|box|
+					var val = box.value;
+					slider.value = specKey.asSpec.unmap(val);
+				})
+			).margins_(5)
+		};
+
+		var loadStack, newLoadView, oldLoadView = View(win);
+		var playStack, oldPlayView, newPlayView;
+
+		var performanceLength = 34, waitBeforeStart = 0;
 
 		oldLoadView.layout_(
 			HLayout(
@@ -363,10 +388,14 @@ MKQTGUI {
 					.font_( Font(fontString,13) )
 					.action_({
 						var folderPath = Platform.userExtensionDir +/+ "MKQT/neuralNets/";
+
 						FileDialog({|path|
 							// check for file types? If .json.not, throw an error?
 
-							path.unbubble.postln;
+							var mlpPath = path.unbubble;
+
+							// MKQT.mlp.read(mlpPath,{ "neural network loaded".postln });
+
 							oldLoadView.layout.add(
 								StaticText()
 								.font_( Font(fontString,13) )
@@ -397,6 +426,7 @@ MKQTGUI {
 				.font_( subtitleFont )
 				.action_({ |but|
 
+					MKQT.train;
 				})
 
 			).spacing_(9).margins_(0)
@@ -411,6 +441,8 @@ MKQTGUI {
 
 						Routine({
 							waitBeforeStart.wait;
+
+							MKQT.startPerformance(performanceLength)                           // play method
 
 						}).play
 
@@ -428,6 +460,8 @@ MKQTGUI {
 					Routine({
 						waitBeforeStart.wait;
 
+						MKQT.startPerformance(performanceLength)                           // play method
+
 					}).play
 
 				}),
@@ -436,39 +470,18 @@ MKQTGUI {
 				.font_( subtitleFont )
 				.action_({ |but|
 
+					var folderPath = Platform.userExtensionDir +/+ "MKQT/neuralNets/";
+					var string = Date.getDate.format("%M%H%d%m%y");
+					FileDialog({ |path|
+						var mlpPath = path.unbubble;
+						MKQT.mlp.write(mlpPath,{ "neural network: % saved".format });
+					},{
+						"neural network: % not saved".format(string).postln;
+					},1,1,false,folderPath +/+ "%.json".format(string) );
 				}),
 
 			).spacing_(9).margins_(0),
 		);
-
-		ezSlider = { |string, specKey, actionFunc|
-			var text = StaticText();
-			var slider = Slider();
-			var numBox = NumberBox();
-
-			VLayout(
-				text
-				.string_(string)
-				.font_( subtitleFont )
-				.align_(\center),
-
-				slider
-				.action_({ |slider|
-					var val = slider.value;
-					numBox.value = specKey.asSpec.map(val).round(0.1);
-					actionFunc.value
-				})
-				.valueAction_(0),
-
-				numBox
-				.font_( subtitleFont )
-				.align_(\center)
-				.action_({|box|
-					var val = box.value;
-					slider.value = specKey.asSpec.unmap(val);
-				})
-			).margins_(5)
-		};
 
 		win.layout_(
 
@@ -543,7 +556,7 @@ MKQTGUI {
 					ezSlider.value("Flo dB",\db),
 					ezSlider.value("Karl dB",\db),
 					ezSlider.value("PC dB",\db),
-					ezSlider.value("PC mix",\unipolar),
+					ezSlider.value("PC mix",\unipolar,{ |val| MKQT.prob = val }),
 				)
 
 			).spacing_(9)

@@ -1,62 +1,7 @@
-(
-// what's the best way to do this? Normalize args and store them in another part of the event?
-var ugenGraphs = Dictionary[
 
-	'bpFreeze' -> { |in, env|
-		var sig = 4.collect({ |i| BPF.ar(in,\freq.kr(200) * [3,5,5.5,7].at(i),0.1,2) });
-		sig = FFT({ LocalBuf(8192) } ! 4,sig);
-		sig = PV_Freeze(sig,1);
-		sig = IFFT(sig);
-		sig = sig * env;
-		// Out.ar(\send.kr,sig.sum * \sendAmp.kr(0));  // do we want this here?
-		sig = Splay.ar(sig,1,\amp.kr(1));
-	},
-];
+Ndef(\mkqtIn).play
 
-var makeDef = { | name, ugenGraph|
-	SynthDef(name.asSymbol,{
-		var atk = \atk.kr(0.01), rls = \rls.kr(1);
-		var env = Env([0,1,1,0],[atk,\length.kr(1) - (atk + rls),rls],\curve.kr(-4)).kr(2);    // this should be used strategically - can be sustained or perc!
-		var sig = SynthDef.wrap(ugenGraph, prependArgs: [ In.ar(\inBus.kr(0)), env ]);
-
-		sig = sig.tanh;
-		Out.ar(\out.kr(0),sig)
-	}).add
-};
-
-ugenGraphs.keysValuesDo({ |synthName, synthFunc|
-
-	makeDef.(synthName, synthFunc);
-
-	"% synths added".format(synthName).postln;
-});
-)
-
-
-SynthDescLib.global.browse
-
-
-SynthDef(\mkqtIn,{
-	var sig = SoundIn.ar(\inBus.kr(0));
-	sig = Mix(sig);
-	sig = Compander.ar(sig,sig,\compThresh.kr(0.5),1,\compRatio.kr(2).reciprocal,\compAtk.kr(0.01),\compRls.kr(0.1),\muGain.kr(2));
-	Out.ar(\sendBus.kr,sig);
-	sig = Pan2.ar(sig,\pan.kr(0),\amp.kr(0));
-	Out.ar(\out.kr(0),sig)
-}).add;
-
-SynthDef(\mkqtAnalysis,{                      // must test this -> can I pass the input bus to the sent OSC msg? How else can I get it to register a trig for the right channel?
-	var sig = In.ar(\inBus.kr());
-	// var onsets = FluidOnsetSlice.ar(sig); // go through these, do some testing if possible???
-	// var specChange = FluidNoveltySlice.ar(sig); // must check this - can I make the buf sizes big enough that it will only trigger at big(ish) changes
-	var time = Sweep.ar(\reset.tr(1));
-
-	SendReply.ar(onsets + specChange,'/address/goes/here',[onsets,specChange,time])
-
-}).add
-
-
-SynthDef(\masterOut,{
+Ndef(\masterOut,{
 	var sig = In.ar(\inBus.kr(0),2);
 	sig = sig.tanh;
 	sig = HPFSides.ar(sig,\sidesHPFreq.kr(80));
@@ -64,7 +9,7 @@ SynthDef(\masterOut,{
 	sig = Compander.ar(sig,sig,\compThresh.kr(0.5),1,\compRatio.kr(2).reciprocal,\compAtk.kr(0.01),\compRls.kr(0.1),\muGain.kr(2));
 	// what else? Limiter. or?
 	Out.ar(\out.kr(0),sig)
-}).add;
+}).play;
 
 
 // Env([0,1,1,0],[atk,\length.kr(1) - (atk + rls),rls],\curve.kr(-4)).kr(2);
@@ -141,12 +86,93 @@ Ndef(\test,{
 
 
 
+(
+
+var env = Dictionary[
+	'perc' -> { Env.perc(\atk.kr(0.01),\rls.kr(1),1,\curve.kr(-4)).kr(2) },
+	'sus' -> {
+		var atk = \atk.kr(0.01), rls = \rls.kr(1);
+		Env([0,1,1,0],[atk,\length.kr(1) - (atk + rls),rls],\curve.kr(-4)).kr(2)
+	},
+];
+
+var src = Dictionary[
+
+	'freeze' -> { |sig|
+		sig = FFT(LocalBuf(4096),sig);
+		sig = PV_Freeze(sig,1);
+		sig = IFFT(sig);
+	},
+
+	'oneTap' -> { |sig|
+		DelayC.ar(sig,0.5,\dly.kr(0.2));
+	},
+
+	'fbDel' -> { |sig|
+		CombC.ar(sig,0.5,\dly.kr(0.2),\dcy.kr(1));
+	},
+
+	'modDel' -> { |sig|
+		CombC.ar(sig,0.5,\dly.kr(0.2) * XLine.kr(1,\pitchSweepArg.kr(1.1),10),\dcy.kr(1));  // find a smart way to do this...can I use a boolean?
+	},
+
+	'loop' -> { |sig|
+		sig = sig * Env.sine().kr;
+		sig = LocalIn.ar(1) + sig;
+		sig = DelayC.ar(sig,0.5,\dly.kr(0.2));
+		LocalOut.ar(sig) * 0.9;
+		sig
+	},
+];
+
+var post = Dictionary[
+
+	'ring' -> { |sig|
+		sig * SinOsc.ar(\freq.kr(300));
+	},
+
+	'freqShift' -> { |sig|
+		FreqShift.ar(sig,\freqDev.kr(25))
+	},
+
+	'comb' -> { |sig|
+		CombC.ar(sig,0.2,\freq.kr(120).reciprocal,-1);
+	}
+
+	'clip' -> { |sig|
+		(sig * 8).clip2
+	}
+
+];
+
+
+// args must be normalized!!!
+
+
+var makeDef = { |name, envFunc, srcFunc, postFunc|
+	SynthDef(name.asSymbol,{
+
+		var env = SynthDef.wrap(envFunc);
+		var sig = SynthDef.wrap(srcFunc, prependArgs: [ In.ar( \inBus.kr(0) )]);
+		sig = SynthDef.wrap(ugenGraph, prependArgs: [ sig ]);
+
+		sig = sig * env;
+
+		sig = sig.tanh;
+		Out.ar(\out.kr(0),sig)
+	}).add
+};
+
+ugenGraphs.keysValuesDo({ |synthName, synthFunc|
+
+	makeDef.(synthName, synthFunc);
+
+	"% synths added".format(synthName).postln;
+});
 
 
 
 
+)
 
-
-
-
-
+// should the output amplitude be controlled somehow? Compander? Amplitude compensation?

@@ -30,24 +30,30 @@ PLAY
 -should have feedback button (map to spacebar?) that adds a point to dataset
 -timed sections, change instruments/intensity/aesthetics
 
-
 -MLPClassifier runs at .kr and tries to classify behaviour based on available choices... must have some filtering (sample and hold?) to ensure longer phrases and not wild switching
 -switch statement a la EIDOLON makes decisions about what kind of processing happens.
-
-
-PC mix - wet/dry control that controls a .coin probability
 
 */
 
 
+Ndef(\masterOut,{
+	var sig = In.ar(\inBus.kr(0),2);
+	sig = sig.tanh;
+	sig = HPFSides.ar(sig,\sidesHPFreq.kr(80));
+	sig = LeakDC.ar(sig);
+	sig = Compander.ar(sig,sig,\compThresh.kr(0.5),1,\compRatio.kr(2).reciprocal,\compAtk.kr(0.01),\compRls.kr(0.1),\muGain.kr(2));
+	// what else? Limiter. or?
+	Out.ar(\out.kr(0),sig)
+}).play;
 
-// check cpu use of FluidSpectralShape.kr() + FluidStats.kr in real time!!
+
+
+
 // make synthLib classvar with keys from the synthLib - this can aid the process when adding new genre dataSets
 // make OSCdef that assigns the genreState variable
 // make OSCdefs that choose synths from lib based on genreState
 // what happens at time boundaries? How does the "sound aesthetic" change?
 // does the synthLib have args in each event as well? Or are they just arg indexes? Or how do I handle this smartly/algorithmically?
-// synthKeys must have a similar logic like EIDOLON - long phrases of the same fx...maybe these get changed at the fibonacci barlines?
 
 // synthLib needs a default key for when new datasets return a genre that doens't have synths yet!
 // when data/Label set is created, it builds a synth Library also - anything that is nil gets filled with Default synths!

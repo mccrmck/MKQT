@@ -1,15 +1,20 @@
 MKQT {
 	classvar <>classifiers;
 	classvar <>mainDataSet, <>mainLabelSet, <>mlp;
-	classvar <janIn, <floIn, <karlIn, <mstrOut, <server;
+	classvar <janIn, <floIn, <karlIn, <mainOut, <server;
 
-	classvar <>classifierIndex, <>prob;
+	classvar <>classifierIndex, <>prob = 0;
+	classvar <>synthLib, <>synthLookup;
+	classvar verbose = false;
 
 	*initClass {
+		Class.initClassTree(Spec);
+		Spec.add(\pcMix,ControlSpec(0,1,3,0.001,0.01));
 
+		synthLib = IdentityDictionary();
 		classifiers = List(); // all classifiers get added to this dictionary and saved?
 
-		ServerTree.add({ |server|                         // check if this makes sense...I think Cmd +. will make new instances, is that good/bad???
+		ServerTree.add({ |server|                         // check if this makes sense...I think Cmd+. will make new instances, is that good/bad???
 			mainDataSet = FluidDataSet(server);
 			mainLabelSet = FluidLabelSet(server);
 			mlp = FluidMLPClassifier(server) },
@@ -17,28 +22,30 @@ MKQT {
 		)
 	}
 
-	// necessary?
-	*new { |janIn, floIn, karlIn, mstrOut, server|
-		^super.new.init(janIn, floIn, karlIn, mstrOut, server)
+	*new { |janIn, floIn, karlIn, mainOut, server|
+		^super.new.init(janIn, floIn, karlIn, mainOut, server)
 	}
 
-	// necessary?
-	init { |janIn_, floIn_, karlIn_, mstrOut_,server_|             // maybe I can make Server.default a class arg here? that would save some characters...
+	init { |janIn_, floIn_, karlIn_, mainOut_,server_|             // maybe I can make Server.default a class arg here? that would save some characters...
+		var path = Platform.userExtensionDir +/+ "MKQT";
 
 		janIn = janIn_;
 		floIn = floIn_;
 		karlIn = karlIn_;
-		mstrOut = mstrOut_;
+		mainOut = mainOut_;
+
+		// should I clear synthLib and classifiers?
 
 		server = server_ ? Server.default;
 
+		synthLookup = File.readAllString(path +/+ "synthLookup.scd").interpret;
 	}
 
 	/* ==== data collection ==== */
 
 	*dataFromLiveInput {}
 
-	*dataFromBuffer { |pathString, plotAnal = false|
+	*dataFromBuffer { |pathString|
 
 		var path = PathName(pathString);
 		var loader = FluidLoadFolder(path);
@@ -87,7 +94,7 @@ MKQT {
 				minLengthBelow: 480,        // The length in samples that the envelope have to be below the threshold to consider it a valid transition to OFF.
 				lookBack: 480,
 				lookAhead: 480,
-				action:{ if(plotAnal,{ FluidWaveform(monoBuf, indicesBuf) }) }
+				action:{ if(verbose,{ FluidWaveform(monoBuf, indicesBuf) }) }
 			);
 
 			server.sync;
@@ -133,7 +140,7 @@ MKQT {
 		names = names.collect({ |name| name.split($_)[0] });
 
 
-		//sort dSets based on file names? and then handle duplicates by merging them?
+		// sort dSets based on file names? and then handle duplicates by merging them?
 		// dSets = this.removeDataSetDoubles;
 
 

@@ -141,6 +141,7 @@ MKQTGUI {
 
 						win.close;
 						Server.default.waitForBoot({
+							MIDIClient.init;
 							MKQT(janIn,floIn,karlIn,outChanIndex);
 							MKQTGUI.playGUI // pass input Args here?
 						});
@@ -150,7 +151,6 @@ MKQTGUI {
 
 		);
 
-		win.onClose_({ "should the startUpwindow boot server onClose?".postln });
 		win.drawFunc = {
 			Pen.addRect(win.view.bounds);
 			Pen.fillAxialGradient(win.view.bounds.leftTop, win.view.bounds.rightBottom, bgLeftGrad, bgRightGrad);
@@ -187,7 +187,7 @@ MKQTGUI {
 
 		var saveString;
 
-		var spacer = { StaticText().string_("________").font_(subtitleFont).align_(\center) };
+		var spacer = { StaticText().string_("________").font_( subtitleFont ).align_(\center) };
 
 		var	inputView = View(win).layout_(
 			HLayout(
@@ -336,7 +336,7 @@ MKQTGUI {
 		var bgLeftGrad = Color.rand(0.3,1), bgRightGrad = Color.rand(0.3,1);
 
 		var backBut =  Button()
-		.focusColor_(Color.clear)
+		.focusColor_( Color.clear )
 		.font_( Font(fontString,13) )
 		.states_([[ "back",Color.black,Color.clear ]])
 		.mouseUpAction_({ |but| but.states_([[ "back",Color.black,Color.clear ]]) })
@@ -346,7 +346,7 @@ MKQTGUI {
 			MKQTGUI.startGUI;
 		});
 
-		var ezSlider = { |string, specKey, actionFunc|
+		var ezSlider = { |string, specKey, round = 0.1, actionFunc|
 			var text = StaticText();
 			var slider = Slider();
 			var numBox = NumberBox();
@@ -360,7 +360,8 @@ MKQTGUI {
 				slider
 				.action_({ |slider|
 					var val = slider.value;
-					numBox.value = specKey.asSpec.map(val).round(0.01);
+					val = specKey.asSpec.map(val).round(round);
+					numBox.value = val;
 					actionFunc.value(val)
 				})
 				.valueAction_(0),
@@ -370,8 +371,10 @@ MKQTGUI {
 				.align_(\center)
 				.action_({|box|
 					var val = box.value;
-					slider.value = specKey.asSpec.unmap(val);
+					val = specKey.asSpec.unmap(val);
+					slider.value = val;
 				})
+				.decimals_(round.asString.split($.)[1].asString.size)
 			).margins_(5)
 		};
 
@@ -393,13 +396,14 @@ MKQTGUI {
 							// check for file types? If .json.not, throw an error?
 
 							var mlpPath = path.unbubble;
+							var mlpName = PathName(path.unbubble).fileNameWithoutExtension;
 
-							// MKQT.mlp.read(mlpPath,{ "neural network loaded".postln });
+							MKQT.mlp.read(mlpPath,{ "neural network: % loaded".format(mlpName).postln });
 
 							oldLoadView.layout.add(
 								StaticText()
 								.font_( Font(fontString,13) )
-								.string_( PathName(path.unbubble).fileNameWithoutExtension )
+								.string_( mlpName )
 								.align_(\right)
 							)
 						},{},1,0,false,folderPath);
@@ -490,10 +494,8 @@ MKQTGUI {
 
 				HLayout(
 					[ backBut, align: \left ],
-
 					StaticText().string_("PLAY").font_(titleFont),
 					backBut.bounds.width
-
 				).spacing_(0),
 
 				HLayout(
@@ -505,7 +507,7 @@ MKQTGUI {
 							performanceLength = menu.value;
 						}),
 						align: \center],
-					[ StaticText().string_("MINUTES").font_(subtitleFont).align_(\left)],
+					[ StaticText().string_("MINUTES").font_(subtitleFont).align_(\left) ],
 				),
 
 				HLayout(
@@ -552,11 +554,11 @@ MKQTGUI {
 				).spacing_(9),
 
 				HLayout(                                         // these need actionFuncs!!
-					ezSlider.value("Jan dB",\db),
-					ezSlider.value("Flo dB",\db),
-					ezSlider.value("Karl dB",\db),
-					ezSlider.value("PC dB",\db),
-					ezSlider.value("PC mix",\unipolar,{ |val| MKQT.prob = val }),
+					ezSlider.value("Jan dB",\db,0.1),
+					ezSlider.value("Flo dB",\db,0.1),
+					ezSlider.value("Karl dB",\db,0.1),
+					ezSlider.value("PC dB",\db,0.1),
+					ezSlider.value("PC mix",\pcMix,0.001,{ |val| MKQT.prob = val }),
 				)
 
 			).spacing_(9)

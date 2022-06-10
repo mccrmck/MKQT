@@ -22,9 +22,8 @@ GUI
 TRAIN         -- should this be changed to DATA instead of train?
 -how do we associate synth behaviour with classifiers? Is that done manually during/after training? Is it absolute?
 
--when does "fitting" happen?? should it fit automatically or only on user request?
 -automate fitting with a routine...can inform band that if they don't like how it's working they can 1. add more data 2. refit to get different results 3. Hire a new programmer??
-
+-can/should I automate Fitting?
 
 PLAY
 -should have feedback button (map to spacebar?) that adds a point to dataset

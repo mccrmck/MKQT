@@ -108,7 +108,7 @@ MKQTGUI {
 						.value_(1)
 						.action_({ |menu|
 							var sRate = menu.item;
-							sampleRate = sRate.asInteger;
+							Server.default.options.sampleRate = sRate;
 							"new sampleRate: %".format(sRate).postln;
 						})
 					)
@@ -129,7 +129,7 @@ MKQTGUI {
 						Server.default.waitForBoot({
 							MKQT(janIn,floIn,karlIn,outChanIndex);
 							MKQTGUI.trainGUI
-						});
+						},onFailure: { "start failed:\nto remedy, try: \n•rebooting SuperCollider\n•rebooting your computer\n•call Mike!!".warn });
 					}),
 					Button()
 					.string_("PLAY")
@@ -144,7 +144,7 @@ MKQTGUI {
 							MIDIClient.init;
 							MKQT(janIn,floIn,karlIn,outChanIndex);
 							MKQTGUI.playGUI // pass input Args here?
-						});
+						},onFailure: { "start failed:\nto remedy, try: \n•rebooting SuperCollider\n•rebooting your computer\n•call Mike!!".warn });
 					}),
 				),
 			).spacing_(9)
@@ -223,7 +223,7 @@ MKQTGUI {
 				if(rViewString.size == 0,{
 					"no path to file or folder\n".postln;
 				},{
-					dataSet = MKQT.dataFromBuffer(rViewString)
+					dataSet = MKQT.dataFromBuffer(rViewString, MKQT.verbose)
 				})
 			}
 		});
@@ -255,7 +255,11 @@ MKQTGUI {
 				HLayout(
 					[ backBut, align: \left ],
 					[ StaticText().string_("TRAIN").font_(titleFont), align: \center ],
-					winW * 0.3
+					[ CheckBox()
+						.string_("verbose")
+						.action_({ |box|
+							MKQT.verbose = 	box.value.asBoolean
+					}), align: \right ]
 
 				).spacing_(0).margins_(0),
 
@@ -494,8 +498,12 @@ MKQTGUI {
 
 				HLayout(
 					[ backBut, align: \left ],
-					StaticText().string_("PLAY").font_(titleFont),
-					backBut.bounds.width
+					[ StaticText().string_("PLAY").font_(titleFont), align: \center ],
+					[ CheckBox()
+						.string_("verbose")
+						.action_({ |box|
+							MKQT.verbose = 	box.value.asBoolean
+					}), align: \right ]
 				).spacing_(0),
 
 				HLayout(
@@ -506,7 +514,7 @@ MKQTGUI {
 						.action_({ |menu|
 							performanceLength = menu.value;
 						}),
-						align: \center],
+						align: \center ],
 					[ StaticText().string_("MINUTES").font_(subtitleFont).align_(\left) ],
 				),
 
@@ -560,7 +568,6 @@ MKQTGUI {
 					ezSlider.value("PC dB",\db,0.1),
 					ezSlider.value("PC mix",\pcMix,0.001,{ |val| MKQT.prob = val }),
 				)
-
 			).spacing_(9)
 		);
 

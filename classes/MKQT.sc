@@ -5,7 +5,7 @@ MKQT {
 
 	classvar <>classifierIndex, <>prob = 0;
 	classvar <>synthLib, <>synthLookup;
-	classvar verbose = false;
+	classvar <>verbose = false;
 
 	*initClass {
 		Class.initClassTree(Spec);
@@ -38,14 +38,14 @@ MKQT {
 
 		server = server_ ? Server.default;
 
-		synthLookup = File.readAllString(path +/+ "synthLookup.scd").interpret;
+		synthLookup = thisProcess.interpreter.executeFile(path +/+ "synthLookup.scd");
 	}
 
 	/* ==== data collection ==== */
 
 	*dataFromLiveInput {}
 
-	*dataFromBuffer { |pathString|
+	*dataFromBuffer { |pathString, analBool = false|
 
 		var path = PathName(pathString);
 		var loader = FluidLoadFolder(path);
@@ -94,7 +94,7 @@ MKQT {
 				minLengthBelow: 480,        // The length in samples that the envelope have to be below the threshold to consider it a valid transition to OFF.
 				lookBack: 480,
 				lookAhead: 480,
-				action:{ if(verbose,{ FluidWaveform(monoBuf, indicesBuf) }) }
+				action:{ if(analBool,{ FluidWaveform(monoBuf, indicesBuf) }) }
 			);
 
 			server.sync;
@@ -171,18 +171,22 @@ MKQT {
 	}
 
 	*train {
-		var dataBool, labelBool;
+		Routine({
+			var dataBool, labelBool;
 
-		mainDataSet.size({ |size| dataBool = size > 0});
-		mainLabelSet.size({ |size| labelBool = size > 0 });
+			mainDataSet.size({ |size| dataBool = size > 0});
+			server.sync;
+			mainLabelSet.size({ |size| labelBool = size > 0 });
+			server.sync;
 
-		if(dataBool and: { labelBool },{
-			mlp.fit( mainDataSet, mainLabelSet,{ |loss|
-				loss.postln;
-			});
-		},{
-			"data: % or labels: % not loaded".format(dataBool, labelBool).postln;
-		})
+			if(dataBool and: { labelBool },{
+				mlp.fit( mainDataSet, mainLabelSet,{ |loss|
+					"loss: %".format(loss).postln;
+				});
+			},{
+				"data: % or labels: % not loaded".format(dataBool, labelBool).postln;
+			})
+		}).play
 	}
 
 
@@ -197,7 +201,4 @@ MKQT {
 	*startPerformance { |performanceDur|
 
 	}
-
-
-
 }

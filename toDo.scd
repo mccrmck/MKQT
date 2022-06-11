@@ -58,7 +58,7 @@ Ndef(\masterOut,{
 // when data/Label set is created, it builds a synth Library also - anything that is nil gets filled with Default synths!
 
 
-~buf = Buffer.read(s,"/Users/mikemccormick/Dropbox/Mac/Desktop/Projects/ternOP/Let them eat the Rich/WAV 010222/Master 010222- 48k24b -01- The road to hell wasn t paved in a day.wav")
+~buf = Buffer.read(s,"/Users/mikemccormick/Dropbox/Mac/Desktop/Projects/ternOP/Let them eat the Rich/WAV 010222/Master 010222- 48k24b -04- Let he who is without sin live in a glass house.wav")
 Ndef(\mkqtPredict).clear
 
 (
@@ -66,7 +66,7 @@ Ndef(\mkqtPredict,{
 	var statsBuf = LocalBuf(14);
 	var outBuf = LocalBuf(1);
 	// var sig = In.ar(\inBus.kr(0),2);
-	var in = PlayBuf.ar(2,~buf,BufRateScale.kr(~buf),startPos: BufFrames.kr(~buf) * 0.4 loop: 1);
+	var in = PlayBuf.ar(2,~buf,BufRateScale.kr(~buf),startPos: BufFrames.kr(~buf) * 0.5, loop: 1);
 	var sig = in.sum * -3.dbamp;
 	var trigGate = (FluidLoudness.kr(sig)[0] > \trigGateThresh.kr(-18) );
 	var trig = Impulse.kr(\trigRate.kr(10) * trigGate);
@@ -74,7 +74,7 @@ Ndef(\mkqtPredict,{
 	sig = FluidStats.kr(sig,20).flat; // should experiment with history window size!!
 
 	FluidKrToBuf.kr(sig,statsBuf);
-	~mlpclassifier.kr(trig, statsBuf, outBuf); // has to be the same instance that was trained!!
+	MKQT.mlp.kr(trig, statsBuf, outBuf); // has to be the same instance that was trained!!
 
 	sig = FluidBufToKr.kr(outBuf);
 
@@ -83,9 +83,6 @@ Ndef(\mkqtPredict,{
 	in
 }).play
 )
-
-
-
 
 // fibonacci barlines
 Ndef(\clock,{
@@ -96,73 +93,82 @@ Ndef(\clock,{
 
 OSCdef(\clockListener,{ |msg, time, addr, recvPort|
 	var timeSinceStart = msg[3].round(1);
-	var fibArray = Array.fib(9,1,1) *  10;
+	var fibArray = Array.fib(9,1,1) * 60;
 	timeSinceStart.postln;
 
 	fibArray.do({ |fibNum|
-		if(timeSinceStart == fibNum,{"yup".postln})        // some sort of synthLibArray.rotate(-1) has to happen here
+		if(timeSinceStart == fibNum,{
+			MKQT.synthLib.keysValuesChange({ |key,synthKeys|
+				synthKeys.rotate(-1)
+			})
+		})
 	});
 
 },'/fibonacci')
 
 
-
-
-
-// needs better name and address
 OSCdef(\test,{ |msg, time, addr, recvPort|
-	var classIndex = msg[3];
-	var guess = MKQT.classifiers[ classIndex ];        // add a median filter here ?!?!?!
-	// MKQT.classifierIndex = classIndex;
+	var classIndex = msg[3];                               // add a median filter here ?!?!?!
+	MKQT.classifierIndex = classIndex;
 
-	guess.postln                                       // add a verbose arg here? Maybe a tickbox on the GUI?
+	if(MKQT.verbose,{ MKQT.classifiers[ classIndex ].postln })
 },'/needs/address')
 
+MKQT.verbose = true
 
 
 
 
+classVar = ['Jan','Flo','Karl'].collect({ |name, index|
+	var rcvAddr = ("/mkqtRespond" ++ name).asSymbol;
 
-// need three sets of the following....can I make a factory function for this???
-(
-Ndef(\mkqtIn,{                                               // compression may not be necessary pga. digital instruments...
-	var sig = SoundIn.ar(\inBus.kr(0));
-	sig = Mix(sig);
-	sig = Compander.ar(sig,sig,\compThresh.kr(0.5),1,\compRatio.kr(2).reciprocal,\compAtk.kr(0.01),\compRls.kr(0.1),\muGain.kr(2));
-	sig = Pan2.ar(sig,\pan.kr(0),\amp.kr(1));
-	Out.ar(\out.kr(0),sig)
-}).play;
-)
+	OSCFunc({ |msg, time, addr, recvPort|
+		var onsetTrig =  msg[3];
+		var specTrig =  msg[4];
 
-Ndef(\mkqtIn)[1] = nil
+		[onsetTrig,specTrig].postln;
 
-(
-Ndef(\mkqtIn).filter(1,{ |in|
-	var sig = in.sum * -3.dbamp;
-	var onsets = FluidOnsetSlice.ar(sig); // go through these, do some testing if possible???
-	var specChange = FluidNoveltySlice.ar(sig,0,11,0.33); // must check this - can I make the buf sizes big enough that it will only trigger at big(ish) changes
+		if( MKQT.prob.coin,{
+			var synthKey = MKQT.classifiers[ MKQT.classifierIndex ];
 
-	SendReply.ar(onsets + specChange,'/mkqtRespond',[onsets,specChange]);
-	in;
+
+			// something genreState ? 'default' ... does this go here?
+
+
+			// Synth instance....args??
+			// this can also be 4.do({ Synth instance w/ randArgs }), especially if they are grain-ish processes
+
+			// if(verbose,{ synthKey.postln })
+
+		});
+
+	},rcvAddr)
 })
-)
 
-OSCdef(\janResponder,{ |msg, time, addr, recvPort|
-	var onsetTrig =  msg[3];
-	var specTrig =  msg[4];
+*startNdefs {
 
-	[onsetTrig,specTrig].postln;
+	['Jan','Flo','Karl'].do({ |name, index|
+		var key = ("mkqtIn" ++ name).asSymbol;
+		var sendAddr = ("/mkqtRespond" ++ name).asSymbol;
 
-	if( MKQT.prob.coin,{
+		Ndef(key,{                                               // compression may not be necessary pga. digital instruments...
+			var sig = SoundIn.ar(\inBus.kr(0));
+			sig = Mix(sig);
+			sig = Compander.ar(sig,sig,\compThresh.kr(0.5),1,\compRatio.kr(2).reciprocal,\compAtk.kr(0.01),\compRls.kr(0.1),\muGain.kr(2));
+			sig = Pan2.ar(sig,\pan.kr(0),\amp.kr(0));
+			Out.ar(\out.kr(0),sig)
+		}).play(out: MKQT.mainOut);
 
+		Ndef(key).filter(1,{ |in|
+			var sig = in.sum * -3.dbamp;
+			var onsets = FluidOnsetSlice.ar(sig); // go through these, do some testing if possible???
+			var specChange = FluidNoveltySlice.ar(sig,0,11,0.33); // must check this - can I make the buf sizes big enough that it will only trigger at big(ish) changes
 
-		// Synth instance....args??
-
-	});
-
-},'/mkqtRespond')
-
-
+			SendReply.ar(onsets + specChange,sendAddr,[onsets,specChange]);
+			in;
+		})
+	})
+}
 
 
 

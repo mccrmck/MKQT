@@ -3,13 +3,13 @@ MKQT {
 	classvar <>mainDataSet, <>mainLabelSet, <>mlp;
 	classvar <janIn, <floIn, <karlIn, <mainOut, <server;
 
-	classvar <>classifierIndex, <>prob = 0;
+	classvar <>classifierIndex = 0, <>prob = 0.01;
 	classvar <>synthLib, <>synthLookup;
 	classvar <>verbose = false;
 
 	*initClass {
 		Class.initClassTree(Spec);
-		Spec.add(\pcMix,ControlSpec(0,1,3,0.001,0.01));
+		Spec.add(\pcMix, ControlSpec(0,1,3,0.001,0.01));
 
 		synthLib = IdentityDictionary();
 		classifiers = List(); // all classifiers get added to this dictionary and saved?
@@ -17,7 +17,7 @@ MKQT {
 		ServerTree.add({ |server|                         // check if this makes sense...I think Cmd+. will make new instances, is that good/bad???
 			mainDataSet = FluidDataSet(server);
 			mainLabelSet = FluidLabelSet(server);
-			mlp = FluidMLPClassifier(server) },
+			mlp = FluidMLPClassifier(server,[5,3,2],activation:1,learnRate: 0.05,momentum: 0.3 ) },
 		\default
 		)
 	}
@@ -132,6 +132,11 @@ MKQT {
 
 	/* ==== playing methods ==== */
 
+	*addSynths { |list = false|
+		var path = Platform.userExtensionDir +/+ "MKQT";
+		thisProcess.interpreter.executeFile(path +/+ "addSynths.scd").value(list);
+	}
+
 	*makeDataAndLabelSets { |paths| // array from GUI
 		var labelId = 0;
 		var names = paths.collect({ |p,i| PathName(p).fileNameWithoutExtension });    		// check for file types? If .json.not, throw an error?
@@ -170,21 +175,29 @@ MKQT {
 		^zeroSet
 	}
 
+	*getLabels {
+		mlp.dump({ |data|
+			data["labels"]["labels"].do({ |name|
+				classifiers.add(name.asSymbol);
+			})
+		});
+	}
+
 	*train {
 		Routine({
-			var dataBool, labelBool;
+			var dataSize, labelSize;
 
-			mainDataSet.size({ |size| dataBool = size > 0});
+			mainDataSet.size({ |size| dataSize = size });
 			server.sync;
-			mainLabelSet.size({ |size| labelBool = size > 0 });
+			mainLabelSet.size({ |size| labelSize = size });
 			server.sync;
 
-			if(dataBool and: { labelBool },{
+			if(dataSize > 0 and: { labelSize > 0 },{
 				mlp.fit( mainDataSet, mainLabelSet,{ |loss|
 					"loss: %".format(loss).postln;
 				});
 			},{
-				"data: % or labels: % not loaded".format(dataBool, labelBool).postln;
+				"data or labels not loaded".postln;
 			})
 		}).play
 	}
@@ -192,13 +205,25 @@ MKQT {
 
 	*fillSynthLib {
 
-		classifiers.do({ |class|
+		if(classifiers.isEmpty,{
+			"no classifiers loaded".postln
+		},{
+			classifiers.do({ |class|
+				var array = synthLookup[class];
 
-		});
-
+				synthLib.put(class.asSymbol, array.scramble)
+			});
+		})
 	}
 
 	*startPerformance { |performanceDur|
 
+	}
+
+
+	*cleanUp {
+		// free buffers
+		// free OSCFuncs
+		// other resources???
 	}
 }

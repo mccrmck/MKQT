@@ -20,7 +20,7 @@ MKQTGUI {
 
 		var janIn = 0;
 		var floIn = 1;
-		var karlIn = 2;
+		var karlIn = [2,3];
 		var outChanIndex = 0;
 		var sampleRate = 48000;
 
@@ -85,9 +85,9 @@ MKQTGUI {
 						.font_( Font(fontString,13) )
 						.action_({ |menu|
 							var index = menu.value;
-							karlIn = index;
+							karlIn = [index,index + 1];
 						})
-						.value_(karlIn)
+						.value_(karlIn[0])
 					),
 					VLayout(
 						StaticText().string_("master out").font_(subtitleFont).align_(\center),
@@ -143,12 +143,12 @@ MKQTGUI {
 						Server.default.waitForBoot({
 							MIDIClient.init;
 							MKQT(janIn,floIn,karlIn,outChanIndex);
+							MKQT.addSynths(MKQT.verbose);                             // should I put a verbose checkBox on the startGUI??
 							MKQTGUI.playGUI // pass input Args here?
 						},onFailure: { "start failed:\nto remedy, try: \n•rebooting SuperCollider\n•rebooting your computer\n•call Mike!!".warn });
 					}),
 				),
 			).spacing_(9)
-
 		);
 
 		win.drawFunc = {
@@ -397,12 +397,13 @@ MKQTGUI {
 						var folderPath = Platform.userExtensionDir +/+ "MKQT/neuralNets/";
 
 						FileDialog({|path|
-							// check for file types? If .json.not, throw an error?
-
-							var mlpPath = path.unbubble;
+							var mlpPath = path.unbubble;                                           // check for file types? If .json.not, throw an error?
 							var mlpName = PathName(path.unbubble).fileNameWithoutExtension;
 
-							MKQT.mlp.read(mlpPath,{ "neural network: % loaded".format(mlpName).postln });
+							MKQT.mlp.read(mlpPath,{
+								MKQT.getLabels;
+								"neural network: % loaded".format(mlpName).postln
+							});
 
 							oldLoadView.layout.add(
 								StaticText()
@@ -442,24 +443,16 @@ MKQTGUI {
 
 		oldPlayView = View(win).layout_(
 			HLayout(
-				[ Button()
-					.states_( [[ "PLAY",Color.black,Color.green(0.8)],["STOP",Color.black,Color.red(0.8)]] )
-					.font_( subtitleFont )
-					.action_({ |but|
+				Button()
+				.states_( [[ "LOAD SETTINGS",Color.black,Color.green(0.8)]] )
+				.font_( subtitleFont )
+				.action_({ |but|
 
-						Routine({
-							waitBeforeStart.wait;
+					Routine({
+						MKQT.fillSynthLib;
 
-							MKQT.startPerformance(performanceLength)                           // play method
-
-						}).play
-
-				}), align: \center]
-			).spacing_(9).margins_(0),
-		);
-
-		newPlayView = View(win).layout_(
-			HLayout(
+					}).play
+				}),
 				Button()
 				.states_( [[ "PLAY",Color.black,Color.green(0.8)],["STOP",Color.black,Color.red(0.8)]] )
 				.font_( subtitleFont )
@@ -472,6 +465,33 @@ MKQTGUI {
 
 					}).play
 
+				})
+			).spacing_(9).margins_(0),
+		);
+
+		newPlayView = View(win).layout_(
+			HLayout(
+				Button()
+				.states_( [[ "LOAD SETTINGS",Color.black,Color.green(0.8)]] )
+				.font_( subtitleFont )
+				.action_({ |but|
+
+					Routine({
+						MKQT.fillSynthLib;
+
+					}).play
+				}),
+				Button()
+				.states_( [[ "PLAY",Color.black,Color.green(0.8)],["STOP",Color.black,Color.red(0.8)]] )
+				.font_( subtitleFont )
+				.action_({ |but|
+
+					Routine({
+						waitBeforeStart.wait;
+
+						MKQT.startPerformance(performanceLength)                           // play method
+
+					}).play
 				}),
 				Button()
 				.states_( [[ "SAVE NEURAL NET",Color.black,Color.green(0.8)]] )
@@ -562,9 +582,9 @@ MKQTGUI {
 				).spacing_(9),
 
 				HLayout(                                         // these need actionFuncs!!
-					ezSlider.value("Jan dB",\db,0.1),
-					ezSlider.value("Flo dB",\db,0.1),
-					ezSlider.value("Karl dB",\db,0.1),
+					ezSlider.value("Jan dB",\db,0.1, { |val| Ndef('mkqtInJan').set(\amp,val.dbamp) }),
+					ezSlider.value("Flo dB",\db,0.1, { |val| Ndef('mkqtInFlo').set(\amp,val.dbamp) }),
+					ezSlider.value("Karl dB",\db,0.1,{ |val| Ndef('mkqtInKarl').set(\amp,val.dbamp) }),
 					ezSlider.value("PC dB",\db,0.1),
 					ezSlider.value("PC mix",\pcMix,0.001,{ |val| MKQT.prob = val }),
 				)
@@ -577,6 +597,7 @@ MKQTGUI {
 		};
 		win.refresh;
 		win.front;
+		win.onClose({ MKQT.cleanUp})
 	}
 
 }

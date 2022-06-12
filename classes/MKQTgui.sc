@@ -144,7 +144,8 @@ MKQTGUI {
 							MIDIClient.init;
 							MKQT(janIn,floIn,karlIn,outChanIndex);
 							MKQT.addSynths(MKQT.verbose);                             // should I put a verbose checkBox on the startGUI??
-							MKQTGUI.playGUI // pass input Args here?
+							MKQTGUI.playGUI;
+							MKQT.playerNdefs;
 						},onFailure: { "start failed:\nto remedy, try: \n•rebooting SuperCollider\n•rebooting your computer\n•call Mike!!".warn });
 					}),
 				),
@@ -585,7 +586,7 @@ MKQTGUI {
 					ezSlider.value("Jan dB",\db,0.1, { |val| Ndef('mkqtInJan').set(\amp,val.dbamp) }),
 					ezSlider.value("Flo dB",\db,0.1, { |val| Ndef('mkqtInFlo').set(\amp,val.dbamp) }),
 					ezSlider.value("Karl dB",\db,0.1,{ |val| Ndef('mkqtInKarl').set(\amp,val.dbamp) }),
-					ezSlider.value("PC dB",\db,0.1),
+					ezSlider.value("PC dB",\db,0.1, {|val| MKQT.ampBus.set(val.dbamp) }),
 					ezSlider.value("PC mix",\pcMix,0.001,{ |val| MKQT.prob = val }),
 				)
 			).spacing_(9)
@@ -597,7 +598,7 @@ MKQTGUI {
 		};
 		win.refresh;
 		win.front;
-		win.onClose({ MKQT.cleanUp})
+		win.onClose({ MKQT.cleanUp })
 	}
 
 }

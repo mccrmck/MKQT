@@ -4,10 +4,11 @@ Dictionary[
 		'loopBpf',
 		'fbDelRlpf',
 		'freezeRlpf',
-		'oneTapFreqShift',
 		'freezeFreqShift',
 		'loopRlpf',
 		'loopFreqShift',
+		'thruFreqShift',
+		'loopPitchShift',
 	],
 
 	'default' -> [
@@ -16,6 +17,18 @@ Dictionary[
 		'fbDelRing',
 		'loopBitCrush',
 		'loopRing',
+		'thruBpf',
+	],
+
+	'freeImpro' -> [
+		'thruPitchShift',
+		'thruComb',
+		'loopClip',
+		'oneTapBpf',
+		'oneTapFreqShift',
+		'oneTapRing',
+		'fbDelClip',
+		'freezePitchShift',
 	],
 
 	'glitch' -> [
@@ -24,6 +37,7 @@ Dictionary[
 		'oneTapBitCrush',
 		'loopComb',
 		'fbDelBitCrush',
+		'fbDelPitchShift',
 	],
 
 	'hipHop' -> [
@@ -32,13 +46,8 @@ Dictionary[
 		'oneTapRlpf',
 		'modDelBpf',
 		'modDelClip',
-	],
-
-	'impro' -> [
-		'loopClip',
-		'oneTapBpf',
-		'oneTapRing',
-		'fbDelClip',
+		'thruRlpf',
+		'oneTapPitchShift',
 	],
 
 	'metal' -> [
@@ -46,6 +55,8 @@ Dictionary[
 		'freezeClip',
 		'fbDelComb',
 		'modDelBitCrush',
+		'thruClip',
+		'thruBitCrush',
 	],
 
 	'rock' -> [
@@ -53,6 +64,8 @@ Dictionary[
 		'modDelRing',
 		'oneTapClip',
 		'fbDelFreqShift',
+		'thruRing',
 		'modDelRlpf',
+		'modDelPitchShift',
 	],
 ]

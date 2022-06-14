@@ -24,11 +24,11 @@
 	var dcySrc = Dictionary[
 
 		'oneTap' -> { |sig, env|
-			DelayC.ar(sig * env,0.5,\dly.kr(0.25).linlin(0,1,0.08,0.5) )
+			DelayC.ar(sig * env,0.5,\dly.kr(0.25).linexp(0,1,0.08,0.5) )
 		},
 
 		'fbDel' -> { |sig, env|
-			CombC.ar(sig * env,0.5,\dly.kr(0.25).linlin(0,1,0.08,0.5),\dcy.kr(0.4).linlin(0,1,0.5,2))
+			CombC.ar(sig * env,0.5,\dly.kr(0.25).linexp(0,1,0.08,0.5),\dcy.kr(0.4).linlin(0,1,0.5,2))
 		},
 
 		'modDel' -> { |sig, env|

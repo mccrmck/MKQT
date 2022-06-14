@@ -1,12 +1,16 @@
 
 MKQTGUI.startGUI
+MKQTGUI.playGUI
 
-MKQT.mlp.learnRate
-MKQT.mlp.momentum = 0.7
+MKQT.mlp.hidden = [12,8,5]
+MKQT.mlp.learnRate = 0.05
+MKQT.mlp.momentum = 0.2
 MKQT.mlp.batchSize = 15
 
 MKQT.synthLib.dopostln
 MKQT(0,1,[4,5])
+
+MKQT.classifiers.clear
 
 s.plotTree
 
@@ -27,3 +31,4 @@ PLAY
 
 // must check signal path - if fades for each player are down, does the analysis still get signal? I think not....
 
+OSCdef(\mkqtPredictOSC).enabled

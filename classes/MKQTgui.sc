@@ -464,7 +464,9 @@ MKQTGUI {
 				.action_({ |but|
 
 					case
-					{but.value == 0}{ "need to make a performance stop functions".postln }
+					{but.value == 0}{
+						MKQT.stopPerformance
+					}
 					{but.value == 1}{
 
 						Routine({
@@ -498,7 +500,9 @@ MKQTGUI {
 				.action_({ |but|
 
 					case
-					{but.value == 0}{ "need to make a performance stop functions".postln }
+					{but.value == 0}{
+						MKQT.stopPerformance
+					}
 					{but.value == 1}{
 
 						Routine({

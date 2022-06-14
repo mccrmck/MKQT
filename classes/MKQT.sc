@@ -14,6 +14,7 @@ MKQT {
 
 		synthLib = IdentityDictionary();
 		classifiers = List(); // all classifiers get added to this dictionary and saved?
+		classifiers.add(\default);
 
 		ServerTree.add({ |server|                         // check if this makes sense...I think Cmd+. will make new instances, is that good/bad???
 			mainDataSet = FluidDataSet(server);
@@ -139,7 +140,7 @@ MKQT {
 		thisProcess.interpreter.executeFile(path +/+ "addSynths.scd").value(list);
 	}
 
-	*makeDataAndLabelSets { |paths| // array from GUI
+	*makeDataAndLabelSets { |paths| // array from GUI                                            // make this a routine w/ server.syncs!!
 		var strings = paths.collect({ |p,i| PathName(p).fileNameWithoutExtension });    		// check for file types? If .json.not, throw an error?
 		var dSets = paths.collect({ |p,i| FluidDataSet(server).read(p,{ "dataSet: % loaded".format(strings[i][0]).postln }) });
 		strings = strings.collect({ |name| name.split($_) });
@@ -212,18 +213,17 @@ MKQT {
 			var inBus = [ MKQT.janIn, MKQT.floIn, MKQT.karlIn ].at(index);
 			var sendBus = MKQT.fxSends[index];
 
-			Ndef(key,{                                               // compression may not be necessary pga. digital instruments...
+			Ndef(key,{
 				var sig = SoundIn.ar(inBus);
 				sig = Mix(sig);
-				// sig = Compander.ar(sig,sig,\compThresh.kr(0.5),1,\compRatio.kr(2).reciprocal,\compAtk.kr(0.01),\compRls.kr(0.1),\muGain.kr(2));
 				Out.ar(sendBus,sig);
 				Pan2.ar(sig,\pan.kr(0));
 			}).play(out: MKQT.mainOut);
 
 			Ndef(key).filter(1,{ |in|
 				var sig = in.sum * -3.dbamp;
-				var onsets = FluidOnsetSlice.ar(sig,threshold: \onsetThresh.kr(0.5)); // go through these, do some testing if possible???
-				var specChange = FluidNoveltySlice.ar(sig,0,11,\noveltyThresh.kr(0.33)); // must check this - should algorithm be 1?
+				var onsets = FluidOnsetSlice.ar(sig, 7, \onsetThresh.kr(0.5), 100, 9, 0, 512); // go through these, do some testing if possible???
+				var specChange = FluidNoveltySlice.ar(sig,1,31,\noveltyThresh.kr(0.33)); // must check this - should algorithm be 1?
 
 				SendReply.ar(onsets + specChange,sendAddr,[onsets,specChange]);
 				in * \amp.kr(0);
@@ -261,11 +261,7 @@ MKQT {
 					})
 				});
 			},{
-				Ndef(\mkqtPredict).clear;
-				OSCdef(\mkqtPredictOSC).clear;
-				synthOSCfuncs.do(_.free);
-				"performance over".postln;
-				// this.stopPerformance  // make something better here - send message to GUI
+				this.stopPerformance
 			});
 		},'/fibonacci')
 	}
@@ -311,17 +307,25 @@ MKQT {
 				// [onsetTrig,specTrig].postln;
 
 				if( MKQT.prob.coin,{
-					var classKey = MKQT.classifiers[ MKQT.classifierIndex ];
-					var synthKey = MKQT.synthLib[ classKey.asSymbol ][0];
+					var classKey = [ MKQT.classifiers[ MKQT.classifierIndex ].asSymbol, \default ].wchoose([0.9,0.1]);
+					var synthKeyIndex = [0,1].wchoose([0.8,0.2]);
+					var synthKey = MKQT.synthLib[ classKey ][synthKeyIndex];
 
 					var defaultArgs = [
 						\inBus,inBus,
-						\pan, 0,                                                      // what do I do with this??? Add randomness? Map to an LFO?
+						\pan, 0.5.rrand(0.8) * 1.xrand2,                                                      // what do I do with this??? Add randomness? Map to an LFO?
 						\out,MKQT.mainOut,
 					];
 
 					var envArgs, envParts, shape, curve;
-					var envStyle = [\perc,\sustain].choose; // what else? Step? lopsided fades?
+					var envStyle = case
+					{classKey == 'ambient'}{ \sustain }
+					{classKey == 'freeImpro'}{ [\perc,\step].choose }
+					{classKey == 'glitch'}{ \step }
+					{classKey == 'hipHop'}{ [\perc,\sustain].choose }
+					{classKey == 'metal'}{ [\perc,\step].choose }
+					{classKey == 'rock'}{ [\perc,\step].choose }
+					{ [\perc,\sustain,\step].choose };
 
 					var uniqueArgs = SynthDescLib.global[synthKey].controlNames.reject({ |cName|
 						cName == 'inBus' || { cName == 'pan' } || { cName == 'amp' } || { cName == 'out' } ||
@@ -342,8 +346,13 @@ MKQT {
 						})
 					}
 					{ envStyle == \sustain }{
-						envParts = 4.rrand(8.0)!2;
-						shape = Env.shapeNumber(\welch);
+						envParts = {3.rrand(8.0)}!2;
+						shape = Env.shapeNumber(\sine);
+						curve = 0;
+					}
+					{ envStyle == \step }{
+						envParts = [0.01,2.rrand(5.0)];
+						shape = Env.shapeNumber(\hold);
 						curve = 0;
 					};
 
@@ -355,6 +364,7 @@ MKQT {
 					];
 
 					// this can also be 4.do({ Synth instance w/ randArgs }), especially if they are grain-ish processes
+					// iter gets assigned; iter.do({ Synth(...) })
 					Synth(synthKey,defaultArgs ++ envArgs ++ uniqueArgs, Ndef(nDefKey).group, \addAfter).map(\amp,MKQT.ampBus);
 
 					if(verbose,{ "%:%".format(synthKey,name).postln })
@@ -363,7 +373,14 @@ MKQT {
 		})
 	}
 
-	* stopPerformance {}
+	*stopPerformance {
+		Ndef(\mkqtPredict).clear;
+		OSCdef(\mkqtPredictOSC).clear;
+		Ndef(\clock).clear;
+		OSCdef(\clockListener).clear;
+		synthOSCfuncs.do(_.free);
+		"performance over".postln;
+	}
 
 	*cleanUp {
 		// free buffers

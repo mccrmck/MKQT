@@ -215,15 +215,15 @@ MKQT {
 			Ndef(key,{                                               // compression may not be necessary pga. digital instruments...
 				var sig = SoundIn.ar(inBus);
 				sig = Mix(sig);
-				sig = Compander.ar(sig,sig,\compThresh.kr(0.5),1,\compRatio.kr(2).reciprocal,\compAtk.kr(0.01),\compRls.kr(0.1),\muGain.kr(2));
-				sig = Pan2.ar(sig,\pan.kr(0));
-				Out.ar(sendBus,sig)
+				// sig = Compander.ar(sig,sig,\compThresh.kr(0.5),1,\compRatio.kr(2).reciprocal,\compAtk.kr(0.01),\compRls.kr(0.1),\muGain.kr(2));
+				Out.ar(sendBus,sig);
+				Pan2.ar(sig,\pan.kr(0));
 			}).play(out: MKQT.mainOut);
 
 			Ndef(key).filter(1,{ |in|
 				var sig = in.sum * -3.dbamp;
-				var onsets = FluidOnsetSlice.ar(sig); // go through these, do some testing if possible???
-				var specChange = FluidNoveltySlice.ar(sig,0,11,0.33); // must check this - can I make the buf sizes big enough that it will only trigger at big(ish) changes
+				var onsets = FluidOnsetSlice.ar(sig,threshold: \onsetThresh.kr(0.5)); // go through these, do some testing if possible???
+				var specChange = FluidNoveltySlice.ar(sig,0,11,\noveltyThresh.kr(0.33)); // must check this - should algorithm be 1?
 
 				SendReply.ar(onsets + specChange,sendAddr,[onsets,specChange]);
 				in * \amp.kr(0);
@@ -265,18 +265,20 @@ MKQT {
 				OSCdef(\mkqtPredictOSC).clear;
 				synthOSCfuncs.do(_.free);
 				"performance over".postln;
+				// this.stopPerformance  // make something better here - send message to GUI
 			});
-
 		},'/fibonacci')
 	}
 
 	*makeMainDefs {
 		Ndef(\mkqtPredict,{
+			var trigGate, trig;
 			var statsBuf = LocalBuf(14);
 			var outBuf = LocalBuf(1);
-			var sig = In.ar( MKQT.mainOut, 2 ).sum * -3.dbamp;
-			var trigGate = ( FluidLoudness.kr(sig)[0] > \trigGateThresh.kr(-18) );
-			var trig = Impulse.kr(\trigRate.kr(10) * trigGate);
+			var sig = SoundIn.ar(janIn) + SoundIn.ar(floIn) + SoundIn.ar(karlIn);
+			sig = Mix(sig);
+			trigGate = ( FluidLoudness.kr(sig)[0] > \trigGateThresh.kr(-18) );
+			trig = Impulse.kr(\trigRate.kr(10) * trigGate);
 			sig = FluidSpectralShape.kr(sig, minFreq: 20);
 			sig = FluidStats.kr(sig,20).flat; // should experiment with history window size!!
 
@@ -288,7 +290,7 @@ MKQT {
 		});
 
 		OSCdef(\mkqtPredictOSC,{ |msg, time, addr, recvPort|
-			var classIndex = msg[3];                               // add a median filter here ?!?!?!
+			var classIndex = msg[3];                                                        // add a median filter here ?!?!?!
 			MKQT.classifierIndex = classIndex;
 
 			if(MKQT.verbose,{ MKQT.classifiers[ classIndex ].postln })
@@ -319,7 +321,7 @@ MKQT {
 					];
 
 					var envArgs, envParts, shape, curve;
-					var envStyle = [\perc,\sustain].choose;
+					var envStyle = [\perc,\sustain].choose; // what else? Step? lopsided fades?
 
 					var uniqueArgs = SynthDescLib.global[synthKey].controlNames.reject({ |cName|
 						cName == 'inBus' || { cName == 'pan' } || { cName == 'amp' } || { cName == 'out' } ||
@@ -330,7 +332,7 @@ MKQT {
 
 					case
 					{ envStyle == \perc }{
-						envParts = [0.01,5.rrand(12.0)].scramble;
+						envParts = [0.01,2.rrand(5.0)].scramble;
 						if(envParts[0] < envParts[1],{
 							shape = Env.shapeNumber(-4);
 							curve = -4;
@@ -353,13 +355,15 @@ MKQT {
 					];
 
 					// this can also be 4.do({ Synth instance w/ randArgs }), especially if they are grain-ish processes
-					Synth(synthKey,defaultArgs ++ envArgs ++ uniqueArgs, Ndef(nDefKey).nodeID, \addToTail).map(\amp,MKQT.ampBus);
+					Synth(synthKey,defaultArgs ++ envArgs ++ uniqueArgs, Ndef(nDefKey).group, \addAfter).map(\amp,MKQT.ampBus);
 
-					if(verbose,{ synthKey.postln })
+					if(verbose,{ "%:%".format(synthKey,name).postln })
 				});
 			},rcvAddr)
 		})
 	}
+
+	* stopPerformance {}
 
 	*cleanUp {
 		// free buffers

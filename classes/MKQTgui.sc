@@ -20,9 +20,9 @@ MKQTGUI {
 
 		var janIn = 0;
 		var floIn = 1;
-		var karlIn = [2,3];
+		var karlIn = [4,5];
 		var outChanIndex = 0;
-		var sampleRate = 48000;
+		var sampleRate = 44100;
 
 		win.layout_(
 
@@ -90,7 +90,7 @@ MKQTGUI {
 						.value_(karlIn[0])
 					),
 					VLayout(
-						StaticText().string_("master out").font_(subtitleFont).align_(\center),
+						StaticText().string_("main out").font_(subtitleFont).align_(\center),
 						PopUpMenu()
 						.items_( Array.fill(7,{|i| "% / %".format(i+1, i+2)}) )
 						.font_( Font(fontString,13) )
@@ -105,7 +105,7 @@ MKQTGUI {
 						PopUpMenu()
 						.items_( ["44100","48000","88200","96000"] )
 						.font_( Font(fontString,13) )
-						.value_(1)
+						.value_(0)
 						.action_({ |menu|
 							var sRate = menu.item;
 							Server.default.options.sampleRate = sRate;
@@ -138,13 +138,17 @@ MKQTGUI {
 					.mouseUpAction_({ |but| but.states_([[ "PLAY",Color.black ]]) })
 					.mouseDownAction_({ |but| but.states_([[ "PLAY",Color.red ]]) })
 					.action_({ |but|
+						var server = Server.default;
 
 						win.close;
-						Server.default.waitForBoot({
+						server.waitForBoot({
 							MIDIClient.init;
 							MKQT(janIn,floIn,karlIn,outChanIndex);
-							MKQT.addSynths(MKQT.verbose);                             // should I put a verbose checkBox on the startGUI??
+							server.sync;
+							MKQT.addSynths(MKQT.verbose);      // should I put a verbose checkBox on the startGUI??
+							server.sync;
 							MKQTGUI.playGUI;
+							server.sync;
 							MKQT.playerNdefs;
 						},onFailure: { "start failed:\nto remedy, try: \n•rebooting SuperCollider\n•rebooting your computer\n•call Mike!!".warn });
 					}),
@@ -386,7 +390,7 @@ MKQTGUI {
 		var loadStack, newLoadView, oldLoadView = View(win);
 		var playStack, oldPlayView, newPlayView;
 
-		var performanceLength = 34, waitBeforeStart = 0;
+		var performanceLength = 34 * 60, waitBeforeStart = 0;
 
 		oldLoadView.layout_(
 			HLayout(
@@ -451,7 +455,7 @@ MKQTGUI {
 
 					Routine({
 						MKQT.fillSynthLib;
-
+						"synthLib filled".postln;
 					}).play
 				}),
 				Button()
@@ -459,12 +463,18 @@ MKQTGUI {
 				.font_( subtitleFont )
 				.action_({ |but|
 
-					Routine({
-						waitBeforeStart.wait;
+					case
+					{but.value == 0}{ "need to make a performance stop functions".postln }
+					{but.value == 1}{
 
-						MKQT.startPerformance(performanceLength)                           // play method
+						Routine({
+							waitBeforeStart.wait;
 
-					}).play
+							"performance START".postln;
+							MKQT.startPerformance(performanceLength)                           // play method
+
+						}).play
+					}
 
 				})
 			).spacing_(9).margins_(0),
@@ -479,7 +489,7 @@ MKQTGUI {
 
 					Routine({
 						MKQT.fillSynthLib;
-
+						"synthLib filled".postln;
 					}).play
 				}),
 				Button()
@@ -487,12 +497,18 @@ MKQTGUI {
 				.font_( subtitleFont )
 				.action_({ |but|
 
-					Routine({
-						waitBeforeStart.wait;
+					case
+					{but.value == 0}{ "need to make a performance stop functions".postln }
+					{but.value == 1}{
 
-						MKQT.startPerformance(performanceLength)                           // play method
+						Routine({
+							waitBeforeStart.wait;
 
-					}).play
+							"performance START".postln;
+							MKQT.startPerformance(performanceLength)                           // play method
+
+						}).play
+					}
 				}),
 				Button()
 				.states_( [[ "SAVE NEURAL NET",Color.black,Color.green(0.8)]] )
@@ -533,7 +549,7 @@ MKQTGUI {
 						.items_(Array.fib(6,3,5))
 						.value_(4)
 						.action_({ |menu|
-							performanceLength = menu.value;
+							performanceLength = menu.value * 60;
 						}),
 						align: \center ],
 					[ StaticText().string_("MINUTES").font_(subtitleFont).align_(\left) ],
@@ -600,5 +616,4 @@ MKQTGUI {
 		win.front;
 		win.onClose({ MKQT.cleanUp })
 	}
-
 }

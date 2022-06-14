@@ -22,7 +22,7 @@ MKQTGUI {
 		var floIn = 1;
 		var karlIn = [4,5];
 		var outChanIndex = 0;
-		var sampleRate = 44100;
+		var sampleRate = "44100";
 
 		win.layout_(
 
@@ -105,12 +105,12 @@ MKQTGUI {
 						PopUpMenu()
 						.items_( ["44100","48000","88200","96000"] )
 						.font_( Font(fontString,13) )
-						.value_(0)
 						.action_({ |menu|
 							var sRate = menu.item;
 							Server.default.options.sampleRate = sRate;
 							"new sampleRate: %".format(sRate).postln;
 						})
+						.value_(0)
 					)
 				),
 				HLayout(
@@ -607,7 +607,7 @@ MKQTGUI {
 					ezSlider.value("Flo dB",\db,0.1, { |val| Ndef('mkqtInFlo').set(\amp,val.dbamp) }),
 					ezSlider.value("Karl dB",\db,0.1,{ |val| Ndef('mkqtInKarl').set(\amp,val.dbamp) }),
 					ezSlider.value("PC dB",\db,0.1, {|val| MKQT.ampBus.set(val.dbamp) }),
-					ezSlider.value("PC mix",\pcMix,0.001,{ |val| MKQT.prob = val }),
+					ezSlider.value("PC mix",\pcMix,0.001,{ |val| /*MKQT.prob = val*/ }),
 				)
 			).spacing_(9)
 		);

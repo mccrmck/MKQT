@@ -32,21 +32,21 @@
 		},
 
 		'modDel' -> { |sig, env|
-			CombC.ar(sig * env,0.55,\dly.kr(0.25).linlin(0,1,0.08,0.5) *
-				XLine.kr(1,Select.kr(\detuneIndex.kr(1).round(1),[0.9,1.1]),10),\dcy.kr(0.4).linlin(0,1,0.5,2))
+			CombC.ar(sig * env,0.55,\dly.kr(0.25).linlin(0,1,0.2,0.25) *
+				XLine.kr(1,Select.kr(\detuneIndex.kr(1).round(1),[0.5,2]),10),\dcy.kr(0.4).linlin(0,1,0.5,2))
 		},
 	];
 
 	var mod = {
-		var modFreq = \modFreq.kr(0.5).linlin(0,1,1,8);
+		var modFreq = \modFreq.kr(0.5).linexp(0,1,1,12);
 		var synthArray = [
-			LFNoise0.ar(modFreq),
-			SinOsc.ar(modFreq),
-			LFNoise1.ar(modFreq),
+			SinOsc.ar(modFreq).range(0.5,1),
+			LFNoise0.ar(modFreq).range(0.5,1),
+			LFNoise1.ar(modFreq).range(0.5,1),
 			1,
-			LFSaw.ar(modFreq),
+			LFSaw.ar(modFreq).range(0.5,1)
 		];
-		Select.kr(\modIndex.kr(0).linlin(0,1,0,synthArray.size-1).round(1),synthArray).range(0.5,1)
+		Select.kr(\modIndex.kr(0).linlin(0,1,0,synthArray.size-1).round(1),synthArray)
 	};
 
 	var post = Dictionary[
@@ -60,7 +60,7 @@
 		},
 
 		'Comb' -> { |sig, mod|
-			CombC.ar(sig,0.2,\freq.kr(0).linexp(0,1,40,250).reciprocal * mod,-1);
+			CombC.ar(sig,0.2,\freq.kr(0).linexp(0,1,40,250).reciprocal * mod,-2);
 		},
 
 		'Clip' -> { |sig|
@@ -72,7 +72,7 @@
 		},
 
 		'Rlpf' -> { |sig, mod|
-			RLPF.ar(sig,\fFreq.kr(0.5).linexp(0,1,600,3000) * mod,0.6,4).clip2
+			RLPF.ar(sig,\fFreq.kr(0.5).linexp(0,1,600,3000) * mod,0.6,2).clip2
 		},
 
 		'BitCrush' -> { |sig, mod|
@@ -80,7 +80,7 @@
 		},
 
 		'PitchShift' -> { |sig, mod|
-			PitchShift.ar(sig,0.1,mod,0.01)
+			PitchShift.ar(sig,0.2,\freq.kr(0).linexp(0,1,0.5,2) * mod)
 		}
 
 	];

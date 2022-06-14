@@ -4,7 +4,7 @@ MKQT {
 	classvar <janIn, <floIn, <karlIn, <mainOut, <server;
 	classvar <fxSends, <ampBus;
 
-	classvar <>classifierIndex = 0, <>prob = 0.01;
+	classvar <>classifierIndex = 0, <>prob;
 	classvar <>synthLib, <>synthLookup, <synthOSCfuncs;
 	classvar <>verbose = false;
 
@@ -13,8 +13,9 @@ MKQT {
 		Spec.add(\pcMix, ControlSpec(0,1,3,0.001,0.01));
 
 		synthLib = IdentityDictionary();
+		prob = Array.fill(3,{0});
 		classifiers = List(); // all classifiers get added to this dictionary and saved?
-		classifiers.add(\default);
+		// classifiers.add(\default);
 
 		ServerTree.add({ |server|                         // check if this makes sense...I think Cmd+. will make new instances, is that good/bad???
 			mainDataSet = FluidDataSet(server);
@@ -110,7 +111,8 @@ MKQT {
 
 					"analyzing slice: % / %".format(sliceIndex,(sliceArray.size / 2 - 1).asInteger).postln;
 
-					FluidBufSpectralShape.processBlocking(server,monoBuf,startFrame, numFrames,features: featuresBuf, minFreq: 20); // featuresBuf = many frames, 7 chans(descriptors)
+					// FluidBufSpectralShape.processBlocking(server,monoBuf,startFrame, numFrames,features: featuresBuf, minFreq: 20); // featuresBuf = many frames, 7 chans(descriptors)
+					FluidBufMFCC.processBlocking(server,monoBuf,startFrame,numFrames,features:featuresBuf,startCoeff:1,numCoeffs:13); //514 frames, 13 channels
 
 					// consider adding weights here...from an FluidBufLoudness maybe?
 					FluidBufStats.processBlocking(server,featuresBuf,stats: statsBuf);                       // statsBuf = 49 frames, 7 chans
@@ -159,6 +161,7 @@ MKQT {
 
 				size.do({ |i|
 					this.mainLabelSet.addLabel("%-%".format(stamp,i),name.asString);  // not sure I need "this"
+					index = index + 1;
 				});
 			})
 		});
@@ -222,7 +225,7 @@ MKQT {
 
 			Ndef(key).filter(1,{ |in|
 				var sig = in.sum * -3.dbamp;
-				var onsets = FluidOnsetSlice.ar(sig, 7, \onsetThresh.kr(0.5), 100, 9, 0, 512); // go through these, do some testing if possible???
+				var onsets = FluidOnsetSlice.ar(sig, 0, \onsetThresh.kr(0.5)); // go through these, do some testing if possible???
 				var specChange = FluidNoveltySlice.ar(sig,1,31,\noveltyThresh.kr(0.33)); // must check this - should algorithm be 1?
 
 				SendReply.ar(onsets + specChange,sendAddr,[onsets,specChange]);
@@ -269,14 +272,15 @@ MKQT {
 	*makeMainDefs {
 		Ndef(\mkqtPredict,{
 			var trigGate, trig;
-			var statsBuf = LocalBuf(14);
+			var statsBuf = LocalBuf(26);
 			var outBuf = LocalBuf(1);
 			var sig = SoundIn.ar(janIn) + SoundIn.ar(floIn) + SoundIn.ar(karlIn);
 			sig = Mix(sig);
 			trigGate = ( FluidLoudness.kr(sig)[0] > \trigGateThresh.kr(-18) );
 			trig = Impulse.kr(\trigRate.kr(10) * trigGate);
-			sig = FluidSpectralShape.kr(sig, minFreq: 20);
-			sig = FluidStats.kr(sig,20).flat; // should experiment with history window size!!
+			// sig = FluidSpectralShape.kr(sig, minFreq: 20);
+			sig = FluidMFCC.kr(sig,13,40,1); // 13 chans
+			sig = FluidStats.kr(sig,20).flat; // 26 chans            // should experiment with history window size!!
 
 			FluidKrToBuf.kr(sig,statsBuf);
 			mlp.kr(trig, statsBuf, outBuf); // has to be the same instance that was trained!!
@@ -306,8 +310,8 @@ MKQT {
 
 				// [onsetTrig,specTrig].postln;
 
-				if( MKQT.prob.coin,{
-					var classKey = [ MKQT.classifiers[ MKQT.classifierIndex ].asSymbol, \default ].wchoose([0.9,0.1]);
+				if( MKQT.prob[index].coin,{
+					var classKey = MKQT.classifiers[ MKQT.classifierIndex ].asSymbol;
 					var synthKeyIndex = [0,1].wchoose([0.8,0.2]);
 					var synthKey = MKQT.synthLib[ classKey ][synthKeyIndex];
 
@@ -374,10 +378,8 @@ MKQT {
 	}
 
 	*stopPerformance {
-		Ndef(\mkqtPredict).clear;
-		OSCdef(\mkqtPredictOSC).clear;
-		Ndef(\clock).clear;
-		OSCdef(\clockListener).clear;
+		Ndef(\mkqtPredict).clear; OSCdef(\mkqtPredictOSC).clear;
+		Ndef(\clock).clear; OSCdef(\clockListener).clear;
 		synthOSCfuncs.do(_.free);
 		"performance over".postln;
 	}

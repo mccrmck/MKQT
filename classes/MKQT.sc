@@ -4,7 +4,7 @@ MKQT {
 	classvar <janIn, <floIn, <karlIn, <mainOut, <server;
 	classvar <fxSends, <ampBus;
 
-	classvar <>classifierIndex = 0, <>prob;
+	classvar <>classifierIndex, <>prob;
 	classvar <>synthLib, <>synthLookup, <synthOSCfuncs;
 	classvar <>verbose = false;
 
@@ -15,6 +15,7 @@ MKQT {
 		synthLib = IdentityDictionary();
 		prob = Array.fill(3,{0});
 		classifiers = List(); // all classifiers get added to this dictionary and saved?
+		classifierIndex = Array.fill(15,{0});
 		// classifiers.add(\default);
 
 		ServerTree.add({ |server|                         // check if this makes sense...I think Cmd+. will make new instances, is that good/bad???
@@ -111,7 +112,6 @@ MKQT {
 
 					"analyzing slice: % / %".format(sliceIndex,(sliceArray.size / 2 - 1).asInteger).postln;
 
-					// FluidBufSpectralShape.processBlocking(server,monoBuf,startFrame, numFrames,features: featuresBuf, minFreq: 20); // featuresBuf = many frames, 7 chans(descriptors)
 					FluidBufMFCC.processBlocking(server,monoBuf,startFrame,numFrames,features:featuresBuf,startCoeff:1,numCoeffs:13); //514 frames, 13 channels
 
 					// consider adding weights here...from an FluidBufLoudness maybe?
@@ -278,7 +278,6 @@ MKQT {
 			sig = Mix(sig);
 			trigGate = ( FluidLoudness.kr(sig)[0] > \trigGateThresh.kr(-18) );
 			trig = Impulse.kr(\trigRate.kr(10) * trigGate);
-			// sig = FluidSpectralShape.kr(sig, minFreq: 20);
 			sig = FluidMFCC.kr(sig,13,40,1); // 13 chans
 			sig = FluidStats.kr(sig,20).flat; // 26 chans            // should experiment with history window size!!
 
@@ -291,7 +290,8 @@ MKQT {
 
 		OSCdef(\mkqtPredictOSC,{ |msg, time, addr, recvPort|
 			var classIndex = msg[3];                                                        // add a median filter here ?!?!?!
-			MKQT.classifierIndex = classIndex;
+			MKQT.classifierIndex[0] = classIndex;
+			MKQT.classifierIndex = MKQT.classifierIndex.rotate(-1);
 
 			if(MKQT.verbose,{ MKQT.classifiers[ classIndex ].postln })
 		},'/mkqtPredict')
@@ -303,6 +303,7 @@ MKQT {
 			var nDefKey = ("mkqtIn" ++ name).asSymbol;
 			var rcvAddr = ("/mkqtRespond" ++ name).asSymbol;
 			var inBus = MKQT.fxSends[index];
+			var classIndex = MKQT.classifierIndex.median;
 
 			OSCFunc({ |msg, time, addr, recvPort|
 				var onsetTrig =  msg[3];
@@ -311,7 +312,7 @@ MKQT {
 				// [onsetTrig,specTrig].postln;
 
 				if( MKQT.prob[index].coin,{
-					var classKey = MKQT.classifiers[ MKQT.classifierIndex ].asSymbol;
+					var classKey = MKQT.classifiers[ classIndex ].asSymbol;
 					var synthKeyIndex = [0,1].wchoose([0.8,0.2]);
 					var synthKey = MKQT.synthLib[ classKey ][synthKeyIndex];
 

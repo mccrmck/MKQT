@@ -68,15 +68,15 @@
 		},
 
 		'Bpf' -> { |sig, mod|
-			BPF.ar(sig,\fFreq.kr(0.5).linexp(0,1,500,1200) * mod,0.6,2).clip2
+			BPF.ar(sig,\fFreq.kr(0.5).linexp(0,1,500,1200) * mod,0.4,2).clip2
 		},
 
 		'Rlpf' -> { |sig, mod|
-			RLPF.ar(sig,\fFreq.kr(0.5).linexp(0,1,600,3000) * mod,0.6,2).clip2
+			RLPF.ar(sig,\fFreq.kr(0.5).linexp(0,1,600,3000) * mod,0.4,2).clip2
 		},
 
 		'BitCrush' -> { |sig, mod|
-			Limiter.ar(Decimator.ar(sig,SampleRate.ir * \sRate.kr(0.25).linlin(0,1,0.1,0.25) * mod,24 * \bits.kr(0).linlin(0,1,0.1,0.5) * mod ) )
+			 Limiter.ar(Decimator.ar(sig,SampleRate.ir * \sRate.kr(0.25).linlin(0,1,0.1,0.25) * mod,24 * \bits.kr(0).linlin(0,1,0.1,0.5) * mod ) )
 		},
 
 		'PitchShift' -> { |sig, mod|

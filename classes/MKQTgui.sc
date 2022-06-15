@@ -576,7 +576,7 @@ MKQTGUI {
 					.action_({ |num|
 
 						waitBeforeStart = num.value;
-						num.value.postln;
+						"waiting % seconds".format(waitBeforeStart).postln;
 					}).maxWidth_(80),
 					StaticText().string_("SECONDS BEFORE STARTING").font_(subtitleFont).minWidth_(250).align_(\right),
 				),

@@ -37,3 +37,6 @@ s.sendMsg("/n_free",1388)
 	},"/testMKQT/%".format(i).asSymbol)
 })
 )
+
+Platform.userExtensionDir.openOS
+

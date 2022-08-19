@@ -56,7 +56,8 @@ MKQT {
 		var loader = FluidLoadFolder(path);
 
 		// buffers
-		var buffer, monoBuf;
+		var buffer;
+		var monoBuf     = Buffer(server);
 		var indicesBuf  = Buffer(server);
 		var featuresBuf = Buffer(server);                           // a buffer for writing the analyses into
 		var statsBuf    = Buffer(server);                           // a buffer for writing the statistical summary of the analyses into
@@ -75,9 +76,8 @@ MKQT {
 
 			// make mono
 			case
-			{ buffer.numChannels == 1 }{ monoBuf = buffer}
+			{ buffer.numChannels == 1 }{ FluidBufCompose.processBlocking(server,buffer,startChan: 0,numChans: 1,destination: monoBuf,destGain: 1) }
 			{ buffer.numChannels == 2 }{
-				monoBuf = Buffer(server);
 				FluidBufCompose.processBlocking(server,buffer,startChan: 0,numChans: 1,gain: -3.dbamp,destination: monoBuf,destGain: 1);
 				FluidBufCompose.processBlocking(server,buffer,startChan: 0,numChans: 1,gain: -3.dbamp,destination: monoBuf,destGain: 1);
 			}
@@ -89,17 +89,21 @@ MKQT {
 			FluidBufAmpGate.processBlocking(server,monoBuf,
 				indices: indicesBuf,
 				rampUp: 48,                 // The number of samples the envelope follower will take to reach the next value when raising.
-				rampDown: 192,             // The number of samples the envelope follower will take to reach the next value when falling.
+				rampDown: 192,              // The number of samples the envelope follower will take to reach the next value when falling.
 
 				// do these two possibly get passed into the function as args?
 				onThreshold: -9,           // The threshold in dB of the envelope follower to trigger an onset, aka to go ON when in OFF state.
-				offThreshold: -12,          // The threshold in dB of the envelope follower to trigger an offset, , aka to go OFF when in ON state.
+				offThreshold: -12,          // The threshold in dB of the envelope follower to trigger an offset, aka to go OFF when in ON state.
 
 				minLengthAbove: 480,        // The length in samples that the envelope have to be above the threshold to consider it a valid transition to ON.
 				minLengthBelow: 480,        // The length in samples that the envelope have to be below the threshold to consider it a valid transition to OFF.
 				lookBack: 480,
 				lookAhead: 480,
-				action:{ if(analBool,{ FluidWaveform(monoBuf, indicesBuf) }) }
+				action: {
+					if(analBool,{
+						{ FluidWaveform(monoBuf,indicesBuf) }.defer
+					})
+				}
 			);
 
 			server.sync;
@@ -110,18 +114,16 @@ MKQT {
 					var numFrames = endFrame - startFrame;
 					sliceIndex = (sliceIndex / 2).asInteger;
 
-					"analyzing slice: % / %".format(sliceIndex,(sliceArray.size / 2 - 1).asInteger).postln;
+					"analyzing slice: % / %".format(sliceIndex + 1,(sliceArray.size / 2).asInteger).postln;
 
-					FluidBufMFCC.processBlocking(server,monoBuf,startFrame,numFrames,features:featuresBuf,startCoeff:1,numCoeffs:13); //514 frames, 13 channels
+					FluidBufMFCC.processBlocking(server,monoBuf,startFrame,numFrames,features:featuresBuf,startCoeff:1,numCoeffs:13); // 514 frames, 13 channels
 
 					// consider adding weights here...from an FluidBufLoudness maybe?
 					FluidBufStats.processBlocking(server,featuresBuf,stats: statsBuf);                       // statsBuf = 49 frames, 7 chans
 
-					// FluidBufCompose.processBlocking()                                                     // possible/useeful to send spectralShape ++ stats for BufFlatten?
-
 					FluidBufFlatten.processBlocking(server,statsBuf,numFrames: 2,destination: flatBuf);      // flatBuf = 14 frames, 1 chan
 
-					dataset.addPoint("%-%".format(Date.getDate.format("%M%H%d%m%y"),sliceIndex),flatBuf);    // does this work?
+					dataset.addPoint("%-%".format(Date.getDate.format("%M%H%d%m%y"),sliceIndex),flatBuf);
 					server.sync;
 				});
 			});
@@ -324,12 +326,12 @@ MKQT {
 
 					var envArgs, envParts, shape, curve;
 					var envStyle = case
-					{classKey == 'ambient'}{ \sustain }
-					{classKey == 'freeImpro'}{ [\perc,\step].choose }
-					{classKey == 'glitch'}{ \step }
-					{classKey == 'hipHop'}{ [\perc,\sustain].choose }
-					{classKey == 'metal'}{ [\perc,\step].choose }
-					{classKey == 'rock'}{ [\perc,\step].choose }
+					{ classKey == 'ambient' }{ \sustain }
+					{ classKey == 'freeImpro' }{ [\perc,\step].choose }
+					{ classKey == 'glitch' }{ \step }
+					{ classKey == 'hipHop' }{ [\perc,\sustain].choose }
+					{ classKey == 'metal' }{ [\perc,\step].choose }
+					{ classKey == 'rock' }{ [\perc,\step].choose }
 					{ [\perc,\sustain,\step].choose };
 
 					var uniqueArgs = SynthDescLib.global[synthKey].controlNames.reject({ |cName|

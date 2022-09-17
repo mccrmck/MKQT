@@ -506,6 +506,7 @@ MKQTGUI {
 					{but.value == 1}{
 
 						Routine({
+							"starting in % seconds".format(waitBeforeStart).postln;
 							waitBeforeStart.wait;
 
 							"performance START".postln;
@@ -553,7 +554,8 @@ MKQTGUI {
 						.items_(Array.fib(6,3,5))
 						.value_(4)
 						.action_({ |menu|
-							performanceLength = menu.value * 60;
+							performanceLength = menu.items[menu.value] * 60;
+							"performance Length: % minutes".format(menu.items[menu.value]).postln;
 						}),
 						align: \center ],
 					[ StaticText().string_("MINUTES").font_(subtitleFont).align_(\left) ],
@@ -607,9 +609,9 @@ MKQTGUI {
 					ezSlider.value("Flo dB",\db,0.1, { |val| Ndef('mkqtInFlo').set(\amp,val.dbamp) }),
 					ezSlider.value("Karl dB",\db,0.1,{ |val| Ndef('mkqtInKarl').set(\amp,val.dbamp) }),
 					ezSlider.value("PC dB",\db,0.1, {|val| MKQT.ampBus.set(val.dbamp) }),
-					ezSlider.value("PC mix",\pcMix,0.001,{ |val| /*MKQT.prob = val*/ }),
-					ezSlider.value("PC mix",\pcMix,0.001,{ |val| /*MKQT.prob = val*/ }),
-					ezSlider.value("PC mix",\pcMix,0.001,{ |val| /*MKQT.prob = val*/ }),
+					ezSlider.value("PC mix",\pcMix,0.001,{ |val| /*MKQT.prob[0] = val*/ }),
+					ezSlider.value("PC mix",\pcMix,0.001,{ |val| /*MKQT.prob[1] = val*/ }),
+					ezSlider.value("PC mix",\pcMix,0.001,{ |val| /*MKQT.prob[2] = val*/ }),
 				)
 			).spacing_(9)
 		);

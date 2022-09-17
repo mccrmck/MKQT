@@ -163,7 +163,7 @@ MKQT {
 
 				size.do({ |i|
 					this.mainLabelSet.addLabel("%-%".format(stamp,i),name.asString);  // not sure I need "this"
-					index = index + 1;
+					index = index + 1;                                                                               // do I need this line? Is it a remnant of something else?
 				});
 			})
 		});
@@ -305,22 +305,22 @@ MKQT {
 			var nDefKey = ("mkqtIn" ++ name).asSymbol;
 			var rcvAddr = ("/mkqtRespond" ++ name).asSymbol;
 			var inBus = MKQT.fxSends[index];
-			var classIndex = MKQT.classifierIndex.median;
 
 			OSCFunc({ |msg, time, addr, recvPort|
 				var onsetTrig =  msg[3];
-				var specTrig =  msg[4];
+				var specTrig  =  msg[4];
+				var classIndex = MKQT.classifierIndex.median;
 
 				// [onsetTrig,specTrig].postln;
 
 				if( MKQT.prob[index].coin,{
-					var classKey = MKQT.classifiers[ classIndex ].asSymbol;
+					var classKey = MKQT.classifiers[ classIndex ].asSymbol ? 'ambient';
 					var synthKeyIndex = [0,1].wchoose([0.8,0.2]);
 					var synthKey = MKQT.synthLib[ classKey ][synthKeyIndex];
 
 					var defaultArgs = [
 						\inBus,inBus,
-						\pan, 0.5.rrand(0.8) * 1.xrand2,                                                      // what do I do with this??? Add randomness? Map to an LFO?
+						\pan, 0.5.rrand(0.8) * 1.xrand2,                     // what do I do with this??? Add randomness? Map to an LFO?
 						\out,MKQT.mainOut,
 					];
 

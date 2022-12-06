@@ -227,7 +227,7 @@ MKQT {
 
 			Ndef(key).filter(1,{ |in|
 				var sig = in.sum * -3.dbamp;
-				var onsets = FluidOnsetSlice.ar(sig, 0, \onsetThresh.kr(0.5)); // go through these, do some testing if possible???
+				var onsets = FluidOnsetSlice.ar(sig, 9, \onsetThresh.kr(0.5)); // go through these, do some testing if possible???
 				var specChange = FluidNoveltySlice.ar(sig,1,31,\noveltyThresh.kr(0.33)); // must check this - should algorithm be 1?
 
 				SendReply.ar(onsets + specChange,sendAddr,[onsets,specChange]);

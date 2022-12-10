@@ -11,6 +11,7 @@ MKQT.synthLib.dopostln
 MKQT(0,1,[4,5])
 
 MKQT.classifiers
+MKQT.classifierIndex
 MKQT.mainDataSet.print
 MKQT.mainLabelSet.print
 
@@ -38,5 +39,4 @@ s.sendMsg("/n_free",1388)
 })
 )
 
-Platform.userExtensionDir.openOS
-
+MKQT.prob

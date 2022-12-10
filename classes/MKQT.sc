@@ -13,7 +13,7 @@ MKQT {
 		Spec.add(\pcMix, ControlSpec(0,1,3,0.001,0.01));
 
 		synthLib = IdentityDictionary();
-		prob = Array.fill(3,{0});
+		prob = Array.fill(3,{0.01});
 		classifiers = List(); // all classifiers get added to this dictionary and saved?
 		classifierIndex = Array.fill(15,{0});
 		// classifiers.add(\default);

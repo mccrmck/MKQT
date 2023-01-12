@@ -76,7 +76,9 @@
 		},
 
 		'BitCrush' -> { |sig, mod|
-			 Limiter.ar(Decimator.ar(sig,SampleRate.ir * \sRate.kr(0.25).linlin(0,1,0.1,0.25) * mod,24 * \bits.kr(0).linlin(0,1,0.1,0.5) * mod ) )
+			var snd = Decimator.ar(sig,SampleRate.ir * \sRate.kr(0.25).linlin(0,1,0.1,0.25) * mod,24 * \bits.kr(0).linlin(0,1,0.1,0.5) * mod );
+			snd = Compander.ar(snd,snd,-22.dbamp,10,1,0.01,0.01);
+			snd = Limiter.ar(snd);
 		},
 
 		'PitchShift' -> { |sig, mod|

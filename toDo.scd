@@ -14,11 +14,10 @@ MKQT.classifiers
 MKQT.classifierIndex
 MKQT.mainDataSet.print
 MKQT.mainLabelSet.print
+MKQT.mlp
 
 s.plotTree
 
-
-// Fix the default thing!! it's fucking up the classifier indexes!! But is probably a good idea!
 
 s.sampleRate
 
@@ -40,3 +39,7 @@ s.sendMsg("/n_free",1388)
 )
 
 MKQT.prob
+
+Quarks.gui
+
+

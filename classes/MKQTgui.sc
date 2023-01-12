@@ -406,8 +406,9 @@ MKQTGUI {
 							var mlpName = PathName(path.unbubble).fileNameWithoutExtension;
 
 							MKQT.mlp.read(mlpPath,{
-								MKQT.getLabels;
-								"neural network: % loaded".format(mlpName).postln
+								MKQT.getLabels({
+									"neural network: % loaded".format(mlpName).postln
+								});
 							});
 
 							oldLoadView.layout.add(
@@ -453,10 +454,9 @@ MKQTGUI {
 				.font_( subtitleFont )
 				.action_({ |but|
 
-					Routine({
-						MKQT.fillSynthLib;
+					MKQT.fillSynthLib({
 						"synthLib filled".postln;
-					}).play
+					});
 				}),
 				Button()
 				.states_( [[ "PLAY",Color.black,Color.green(0.8)],["STOP",Color.black,Color.red(0.8)]] )

@@ -18,12 +18,6 @@ MKQT {
 		classifierIndex = Array.fill(15,{0});
 		// classifiers.add(\default);
 
-		ServerTree.add({ |server|                         // check if this makes sense...I think Cmd+. will make new instances, is that good/bad???
-			mainDataSet = FluidDataSet(server);
-			mainLabelSet = FluidLabelSet(server);
-			mlp = FluidMLPClassifier(server,[11,8],activation:1,learnRate: 0.05,momentum: 0.3 ) },
-		\default
-		)
 	}
 
 	*new { |janIn, floIn, karlIn, mainOut, server|
@@ -40,6 +34,10 @@ MKQT {
 		mainOut = mainOut_;
 		fxSends = Array.fill(3,{ Bus.audio(server) });
 		ampBus = Bus.control(server);
+
+		mainDataSet = FluidDataSet(server);
+		mainLabelSet = FluidLabelSet(server);
+		mlp = FluidMLPClassifier(server,[11,8],activation:1,learnRate: 0.05,momentum: 0.3 );
 
 		// should I clear synthLib and classifiers?
 
@@ -79,9 +77,9 @@ MKQT {
 			{ buffer.numChannels == 1 }{ FluidBufCompose.processBlocking(server,buffer,startChan: 0,numChans: 1,destination: monoBuf,destGain: 1) }
 			{ buffer.numChannels == 2 }{
 				FluidBufCompose.processBlocking(server,buffer,startChan: 0,numChans: 1,gain: -3.dbamp,destination: monoBuf,destGain: 1);
-				FluidBufCompose.processBlocking(server,buffer,startChan: 0,numChans: 1,gain: -3.dbamp,destination: monoBuf,destGain: 1);
+				FluidBufCompose.processBlocking(server,buffer,startChan: 1,numChans: 1,gain: -3.dbamp,destination: monoBuf,destGain: 1);
 			}
-			{ buffer.numChannels > 2 }{ "multichannel file input not implemented yet - remind Mike".warn };
+			{ buffer.numChannels > 2 }{ "multichannel file input not implemented yet - remind Mike".warn }; // this should be simply numChannels.do{ /*clever gaincompensation thing here*/}
 
 			server.sync;
 
@@ -181,11 +179,14 @@ MKQT {
 		^zeroSet
 	}
 
-	*getLabels {
+	*getLabels { |action|
 		mlp.dump({ |data|
-			data["labels"]["labels"].do({ |name|
-				classifiers.add(name.asSymbol);
-			})
+			fork{
+				data["labels"]["labels"].do({ |name|
+					classifiers.add(name.asSymbol);
+				});
+				action.value;
+			}
 		});
 	}
 
@@ -197,16 +198,19 @@ MKQT {
 
 	}
 
-	*fillSynthLib {
+	*fillSynthLib { |action|
 
 		if(classifiers.isEmpty,{
 			"no classifiers loaded".postln
 		},{
-			classifiers.do({ |class|
-				var array = synthLookup[class];
+			fork{
+				classifiers.do({ |class|
+					var array = synthLookup[class];
 
-				synthLib.put(class.asSymbol, array.scramble)
-			});
+					synthLib.put(class.asSymbol, array.scramble)
+				});
+				action.value;
+			}
 		});
 	}
 
@@ -278,7 +282,7 @@ MKQT {
 			var outBuf = LocalBuf(1);
 			var sig = SoundIn.ar(janIn) + SoundIn.ar(floIn) + SoundIn.ar(karlIn);
 			sig = Mix(sig);
-			trigGate = ( FluidLoudness.kr(sig)[0] > \trigGateThresh.kr(-18) );
+			trigGate = 1 - ( FluidLoudness.kr(sig)[0] < \trigGateThresh.kr(-18) );
 			trig = Impulse.kr(\trigRate.kr(10) * trigGate);
 			sig = FluidMFCC.kr(sig,13,40,1); // 13 chans
 			sig = FluidStats.kr(sig,20).flat; // 26 chans            // should experiment with history window size!!
@@ -287,7 +291,7 @@ MKQT {
 			mlp.kr(trig, statsBuf, outBuf); // has to be the same instance that was trained!!
 			sig = FluidBufToKr.kr(outBuf);
 
-			SendReply.kr(trig,'/mkqtPredict',[ sig ]);
+			SendReply.kr(trig,'/mkqtPredict',[ sig.zap ]);
 		});
 
 		OSCdef(\mkqtPredictOSC,{ |msg, time, addr, recvPort|
@@ -314,7 +318,7 @@ MKQT {
 				// [onsetTrig,specTrig].postln;
 
 				if( MKQT.prob[index].coin,{
-					var classKey = MKQT.classifiers[ classIndex ].asSymbol ? 'ambient';
+					var classKey = (MKQT.classifiers[ classIndex ] ? "ambient").asSymbol;
 					var synthKeyIndex = [0,1].wchoose([0.8,0.2]);
 					var synthKey = MKQT.synthLib[ classKey ][synthKeyIndex];
 

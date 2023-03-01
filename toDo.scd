@@ -16,6 +16,7 @@ MKQT.mainDataSet.print
 MKQT.mainLabelSet.print
 MKQT.mlp
 
+
 s.plotTree
 
 
@@ -43,3 +44,4 @@ MKQT.prob
 Quarks.gui
 
 
+s.addr = NetAddr("localhost",6666)

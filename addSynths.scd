@@ -77,7 +77,7 @@
 
 		'BitCrush' -> { |sig, mod|
 			var snd = Decimator.ar(sig,SampleRate.ir * \sRate.kr(0.25).linlin(0,1,0.1,0.25) * mod,24 * \bits.kr(0).linlin(0,1,0.1,0.5) * mod );
-			snd = Compander.ar(snd,snd,-22.dbamp,10,1,0.01,0.01);
+			snd = Compander.ar(snd,snd,-18.dbamp,10,1,0.01,0.01);
 			snd = Limiter.ar(snd);
 		},
 
@@ -94,7 +94,7 @@
 		EnvGen.kr(envArray, doneAction: dAction)
 	};
 
-	var silence = { |sig| DetectSilence.ar(sig,-60.dbamp,0.2,2) };
+	var silence = { |sig| DetectSilence.ar(sig,-42.dbamp,0.1,2) };
 
 	// envs after processing
 	susSrc.keysValuesDo({ |srcKey, srcFunc|

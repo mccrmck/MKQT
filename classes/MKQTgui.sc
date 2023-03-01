@@ -604,14 +604,28 @@ MKQTGUI {
 					)
 				).spacing_(9),
 
-				HLayout(                                         // these need actionFuncs!!
+				HLayout(
 					ezSlider.value("Jan dB",\db,0.1, { |val| Ndef('mkqtInJan').set(\amp,val.dbamp) }),
 					ezSlider.value("Flo dB",\db,0.1, { |val| Ndef('mkqtInFlo').set(\amp,val.dbamp) }),
 					ezSlider.value("Karl dB",\db,0.1,{ |val| Ndef('mkqtInKarl').set(\amp,val.dbamp) }),
 					ezSlider.value("PC dB",\db,0.1, {|val| MKQT.ampBus.set(val.dbamp) }),
-					ezSlider.value("PC mix",\pcMix,0.001,{ |val| /*MKQT.prob[0] = val*/ }),
-					ezSlider.value("PC mix",\pcMix,0.001,{ |val| /*MKQT.prob[1] = val*/ }),
-					ezSlider.value("PC mix",\pcMix,0.001,{ |val| /*MKQT.prob[2] = val*/ }),
+					ezSlider.value("PC ACTIVITY",\pcMix,0.1,{ |val|
+						3.do({ |i|
+							MKQT.prob[i] = val
+						})
+					}),
+					ezSlider.value("PEAK THRESH",\db,0.1,{ |val|
+						['Jan','Flo','Karl'].do({ |name, index|
+							var key = ("mkqtIn" ++ name).asSymbol;
+							Ndef(key).set(\onsetThresh,val)
+						})
+					}),
+					/*	ezSlider.value("NOVELTY \nTHRESH",\db,0.01,{ |val|
+					['Jan','Flo','Karl'].do({ |name, index|
+					var key = ("mkqtIn" ++ name).asSymbol;
+					Ndef(key).set(\noveltyThresh,val)
+					})
+					}),*/
 				)
 			).spacing_(9)
 		);

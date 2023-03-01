@@ -10,7 +10,7 @@ MKQT {
 
 	*initClass {
 		Class.initClassTree(Spec);
-		Spec.add(\pcMix, ControlSpec(0,1,3,0.001,0.01));
+		Spec.add(\pcMix, ControlSpec(0,1,3,0.001,0.02));
 
 		synthLib = IdentityDictionary();
 		prob = Array.fill(3,{0.01});
@@ -67,8 +67,8 @@ MKQT {
 
 			//  buffer
 			case
-			{path.isFile}{ buffer = Buffer.read(server,pathString) }
-			{path.isFolder}{ loader.play(server,{ buffer = loader.buffer }) };
+			{ path.isFile }{ buffer = Buffer.read(server,pathString) }
+			{ path.isFolder }{ loader.play(server,{ buffer = loader.buffer }) };
 
 			server.sync;
 
@@ -143,9 +143,9 @@ MKQT {
 	}
 
 	*makeDataAndLabelSets { |paths| // array from GUI                                            // make this a routine w/ server.syncs!!
-		var strings = paths.collect({ |p,i| PathName(p).fileNameWithoutExtension });    		// check for file types? If .json.not, throw an error?
-		var dSets = paths.collect({ |p,i| FluidDataSet(server).read(p,{ "dataSet: % loaded".format(strings[i][0]).postln }) });
-		strings = strings.collect({ |name| name.split($_) });
+		var strings = paths.collect({ |p, i| PathName(p).fileNameWithoutExtension });    		// check for file types? If .json.not, throw an error?
+		var dSets   = paths.collect({ |p, i| FluidDataSet(server).read(p,{ "dataSet: % loaded".format(strings[i][0]).postln }) });
+		strings     = strings.collect({ |name| name.split($_) });
 
 		// sort dSets based on file names? and then handle duplicates by merging them?
 		// dSets = this.removeDataSetDoubles;

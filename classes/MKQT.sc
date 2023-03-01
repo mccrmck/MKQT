@@ -10,7 +10,7 @@ MKQT {
 
 	*initClass {
 		Class.initClassTree(Spec);
-		Spec.add(\pcMix, ControlSpec(0,1,3,0.001,0.02));
+		Spec.add(\pcMix, ControlSpec(0,1,\lin,0.001,0.5));
 
 		synthLib = IdentityDictionary();
 		prob = Array.fill(3,{0.01});

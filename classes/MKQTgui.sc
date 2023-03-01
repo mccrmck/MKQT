@@ -362,9 +362,9 @@ MKQTGUI {
 
 			VLayout(
 				text
-				.string_(string)
+				.string_( string )
 				.font_( subtitleFont )
-				.align_(\center),
+				.align_( \center ),
 
 				slider
 				.action_({ |slider|
@@ -611,13 +611,13 @@ MKQTGUI {
 					ezSlider.value("PC dB",\db,0.1, {|val| MKQT.ampBus.set(val.dbamp) }),
 					ezSlider.value("PC ACTIVITY",\pcMix,0.1,{ |val|
 						3.do({ |i|
-							MKQT.prob[i] = val
+							MKQT.prob[i] = val / 50
 						})
 					}),
 					ezSlider.value("PEAK THRESH",\db,0.1,{ |val|
 						['Jan','Flo','Karl'].do({ |name, index|
 							var key = ("mkqtIn" ++ name).asSymbol;
-							Ndef(key).set(\onsetThresh,val)
+							Ndef(key).set(\onsetThresh,val.dbamp)
 						})
 					}),
 					/*	ezSlider.value("NOVELTY \nTHRESH",\db,0.01,{ |val|

@@ -42,6 +42,3 @@ s.sendMsg("/n_free",1388)
 MKQT.prob
 
 Quarks.gui
-
-
-s.addr = NetAddr("localhost",6666)

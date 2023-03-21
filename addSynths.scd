@@ -111,7 +111,7 @@
 
 					sig = sig * SynthDef.wrap(envFunc,prependArgs: [ 2 ]);
 					sig = Pan2.ar(sig,\pan.kr(0),\amp.kr(0.5));             // is this the best place for spatialization ?!?!?
-					sig = HPFSides.ar(sig,\sidesHPFreq.kr(80));
+					sig = HPFSides.ar(sig,80);
 
 					Out.ar(\out.kr(0),sig)
 				}).add;
@@ -137,7 +137,7 @@
 
 					SynthDef.wrap(silence, prependArgs: [ sig ]);
 					sig = Pan2.ar(sig,\pan.kr(0),\amp.kr(0.5));             // is this the best place for spatialization ?!?!?
-					sig = HPFSides.ar(sig,\sidesHPFreq.kr(80));
+					sig = HPFSides.ar(sig,80);
 
 					Out.ar(\out.kr(0),sig)
 				}).add;

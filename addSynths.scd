@@ -68,7 +68,7 @@
 		},
 
 		'Bpf' -> { |sig, mod|
-			BPF.ar(sig,\fFreq.kr(0.5).linexp(0,1,500,1200) * mod,0.4,2).clip2
+			BPF.ar(sig,\fFreq.kr(0.5).linexp(0,1,500,1200) * mod,1,2).clip2
 		},
 
 		'Rlpf' -> { |sig, mod|
@@ -94,7 +94,7 @@
 		EnvGen.kr(envArray, doneAction: dAction)
 	};
 
-	var silence = { |sig| DetectSilence.ar(sig,-42.dbamp,0.1,2) };
+	var silence = { |sig| DetectSilence.ar(sig,-36.dbamp,0.1,2) };
 
 	// envs after processing
 	susSrc.keysValuesDo({ |srcKey, srcFunc|

@@ -19,13 +19,23 @@ MKQT.mlp
 
 s.plotTree
 
+s.options.numInputBusChannels = 64
+s.options.numOutputBusChannels = 64
 
 s.sampleRate
 
 OSCFunc.trace(false)
 NetAddr.localAddr
 
-s.sendMsg("/n_free",1388)
+
+//single probs
+s.sendMsg("/n_free",6338)
+
+MKQT.prob = [0.05,0.05,0.05]
+MKQT.prob = [0.08,0.08,0.08]
+MKQT.prob = [0.1,0.1,0.1]
+
+
 
 (
 3.do({ |i|

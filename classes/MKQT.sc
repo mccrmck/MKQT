@@ -324,7 +324,7 @@ MKQT {
 
 					var defaultArgs = [
 						\inBus,inBus,
-						\pan, 0.5.rrand(0.8) * 1.xrand2,                     // what do I do with this??? Add randomness? Map to an LFO?
+						\pan, 0.3.rrand(0.6) * 1.xrand2,                     // what do I do with this??? Add randomness? Map to an LFO?
 						\out,MKQT.mainOut,
 					];
 

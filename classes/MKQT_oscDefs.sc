@@ -178,7 +178,7 @@
 		OSCdef(\karlCalibrate,{ |msg|
 			msg.postln
 
-		},'/karlTrigger')
+		},'/karlTrigger');
 
 
 

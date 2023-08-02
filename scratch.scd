@@ -35,6 +35,7 @@ m.stopOSCVisuals
 // change after a certain amount of time...new MLP?!
 // tabbed interface for trainingPanel -> add points to new dataset, append to old dataset, train new MLP, retrain MLP on existing data
 // can back button reset GUI?
+// make o-s-c send a free/close message to SC!
 
 ~ds0 = FluidDataSet(s).read("/Users/mikemccormick/Library/Application Support/SuperCollider/Extensions/MKQT/newDS/230731_223536flo_analyDS.json")
 ~ds1 = FluidDataSet(s).read("/Users/mikemccormick/Library/Application Support/SuperCollider/Extensions/MKQT/newDS/230731_230821jan_synthDS.json")
@@ -50,3 +51,5 @@ m.stopOSCVisuals
 ~mlp.write("/Users/mikemccormick/Library/Application Support/SuperCollider/Extensions/MKQT/newMLP/%jan.json".format(Date.getDate.stamp))
 
 
+
+FluidAmpFeature.version(s)

@@ -17,8 +17,8 @@ MKQTv2 {
 					var mfcc     = FluidMFCC.kr(sig,13,40,1,); // 13 coeffs
 					var spectrum = FluidSpectralShape.kr(sig,['centroid', 'spread', 'rolloff', 'flatness']); // centroid, spread, rolloff, flatness
 					var loudness = FluidLoudness.kr(sig,[\loudness]); // loudness
-					var time = Sweep.ar;
-					var info = [pitch, mfcc, spectrum, loudness,time].flat;
+					var time     = Sweep.ar;
+					var info     = [pitch, mfcc, spectrum, loudness,time].flat;
 					SendReply.kr(Impulse.kr(\trigFreq.kr(0)),oscKey,info);
 					in
 				}
@@ -41,7 +41,7 @@ MKQTv2 {
 	openStageControl {
 		var unixString = "open /Applications/open-stage-control.app --args " ++
 		"--send 127.0.0.1:% ".format( NetAddr.localAddr.port ) ++
-		"--load '%'".format(Platform.userExtensionDir +/+ "/MKQT/main.json");
+		"--load '%'".format(Platform.userExtensionDir +/+ "/MKQT/gui/main.json");
 
 		unixString.unixCmd
 	}
@@ -69,7 +69,6 @@ MKQTTrain {
 
 		server.quit;
 		server.waitForBoot({
-
 			mlp          = FluidMLPRegressor(server, [15,12], FluidMLPRegressor.relu, FluidMLPRegressor.relu,learnRate: 0.01);
 			analyDataSet = FluidDataSet(server);
 			synthDataSet = FluidDataSet(server);
@@ -167,7 +166,7 @@ MKQTTrain {
 	train { mlp.fit(analyDataSet,synthDataSet,{ |loss| "loss: %".format(loss).postln }) }
 
 	saveDataSets { |path|
-		var date = Date.getDate.stamp;
+		var date     = Date.getDate.stamp;
 		var pathName = PathName(path);
 		var fileName = pathName.fileNameWithoutExtension;
 
@@ -192,8 +191,6 @@ MKQTTrain {
 
 MKQTPlay {
 
-	// clean all this up, it's disgusting!
-
 	var <>janBus, <>floBus, <>karlBus, <>outBus;
 	var <mlps, <analyBuffer, <synthBuffer, visualBuffer;
 	var <>coinProb, sendBusses;
@@ -201,7 +198,8 @@ MKQTPlay {
 	var <mixer;
 	var <eqBusses, <compCrossO, <compBusses;
 
-	var	server, mlpMedianFilt, visMedianFilt;
+	var	server;
+	var mlpMedianFilt, visMedianFilt;
 	var trigDelta;
 	var visualLoop, <>visBool = true, <>visualIP, <>visualPort;
 
@@ -215,16 +213,16 @@ MKQTPlay {
 		server.quit;
 		server.waitForBoot({
 
-			mlps         = ( jan: FluidMLPRegressor(server), flo: FluidMLPRegressor(server), karl: FluidMLPRegressor(server) );
-			analyBuffer  = Buffer.alloc(server,19);
-			synthBuffer  = Buffer.alloc(server,10);
-			visualBuffer = Buffer.alloc(server,20);
+			mlps          = ( jan: FluidMLPRegressor(server), flo: FluidMLPRegressor(server), karl: FluidMLPRegressor(server) );
+			analyBuffer   = Buffer.alloc(server,19);
+			synthBuffer   = Buffer.alloc(server,10);
+			visualBuffer  = Buffer.alloc(server,20);
 
 			mlpMedianFilt = Array.fill(15,{ 0 });   //  / 30 for time in seconds
 			visMedianFilt = Array.fill(5,{ 0 });   //  / 20 for time in seconds
 
-			coinProb = 0.1;
-			trigDelta = ( jan: 0, flo: 0, karl: 0 );
+			coinProb      = 0.1;
+			trigDelta     = ( jan: 0, flo: 0, karl: 0 );
 
 			eqBusses = (
 				freq:  Bus.control(server,5).setn([40,160,640,1280,5120]),
@@ -259,7 +257,7 @@ MKQTPlay {
 	}
 
 	makeMixer {
-		var cond = CondVar();
+		var cond   = CondVar();
 		sendBusses = (
 			jan: Bus.audio(server,2),
 			flo: Bus.audio(server,2),
@@ -268,23 +266,23 @@ MKQTPlay {
 
 		fork {
 			var run = 0;
-			mixer = Mixer('mkqtMain',['jan','flo','karl'],outBus,server,{ cond.signalOne });
+			mixer   = Mixer('mkqtMain',['jan','flo','karl'],outBus,server,{ cond.signalOne });
 			cond.wait { mixer.fader.notNil };
-			this.addSendStrips({ run = run + 1; cond.signalOne });
+			this.addSendStrips({ run = run + 1; ".".post; cond.signalOne });
+			cond.wait{  run == 3; };
+			run     = 0; "\n".postln;
+			this.addSends({ run = run + 1; ".".post; cond.signalOne });
 			cond.wait{ run == 3 };
-			run = 0; ".\n".postln;
-			this.addSends({ run = run + 1; cond.signalOne });
+			run     = 0; "\n".postln;
+			this.addInSynths({ run = run + 1; ".".post; cond.signalOne });
 			cond.wait{ run == 3 };
-			run = 0;
-			this.addInSynths({ run = run + 1; cond.signalOne });
-			cond.wait{ run == 3 };
-			run = 0;
-			this.addMixerInserts({ run = run + 1; cond.signalOne });
+			run     = 0; "\n".postln;
+			this.addMixerInserts({ run = run + 1; ".".post; cond.signalOne });
 			cond.wait{ run == 2 };
-			run = 0;
-			this.loadMLPs({ run = run + 1; cond.signalOne });
+			run     = 0; "\n".postln;
+			this.loadMLPs({ run = run + 1; ".".post; cond.signalOne });
 			cond.wait{ run == 3 };
-			"\nπ∆∞m∫ loaded".postln;
+			"\n\nπ∆∞m∫ loaded".postln;
 		};
 	}
 
@@ -305,7 +303,7 @@ MKQTPlay {
 			mixer[key].addPreFaderSend("%Analy".format(key).asSymbol,mixer.sends['analyzer'].stripBus,{ |analySend|       // preFSend(3) inSynth -> global Analyzer
 				var fxKey = "%FX".format(key).asSymbol;
 				analySend.set(\amp,1);
-				mixer[key].addPreFaderSend(fxKey,sendBusses[key],{ |fxSend|                           // preFSend(3) inSynth -> fx Strip
+				mixer[key].addPreFaderSend(fxKey,sendBusses[key],{ |fxSend|                                               // preFSend(3) inSynth -> fx Strip
 					fxSend.set(\amp,1);
 					mixer.sends[fxKey].addPreFaderSend("%Visual".format(key).asSymbol,mixer.sends['visualizer'].stripBus,{ |visualSend| // preFSend(3) fx -> visuals
 						visualSend.set(\amp,1);
@@ -334,7 +332,7 @@ MKQTPlay {
 
 	prTriggerSynth { |key|
 		^{ |in|
-			var onsets = FluidOnsetSlice.ar(HPF.ar(in.sum,160),9,\onsetThresh.kr(0.5));
+			var onsets  = FluidOnsetSlice.ar(HPF.ar(in.sum,160),9,\onsetThresh.kr(0.5));
 			var novelty = FluidNoveltySlice.ar(in.sum,1,31,\noveltyThresh.kr(0.33));   // what does this even mean? How to calibrate?
 			SendReply.ar(onsets + novelty,"/%".format(key).asSymbol,[onsets,novelty]);
 			in
@@ -406,17 +404,17 @@ MKQTPlay {
 
 	startAnalysis {
 		OSCdef(\parseAnalysis,{ |msg|
-			var pitch    = msg[3].explin(20,20000,0,1);
-			var conf     = msg[4];
-			var mfcc     = msg[5..17].linlin(-250,250,0,1);
-			var centroid = msg[18].explin(20,20000,0,1);
-			var spread   = msg[19].explin(20,20000,0,1);
-			var rolloff  = msg[20].explin(20,20000,0,1);
-			var flatness = \db.asSpec.unmap(msg[21]);
-			var loudness = \db.asSpec.unmap(msg[22]);
-			var data = [pitch, conf, mfcc, centroid, rolloff, flatness, loudness].flat;
+			var pitch     = msg[3].explin(20,20000,0,1);
+			var conf      = msg[4];
+			var mfcc      = msg[5..17].linlin(-250,250,0,1);
+			var centroid  = msg[18].explin(20,20000,0,1);
+			var spread    = msg[19].explin(20,20000,0,1);
+			var rolloff   = msg[20].explin(20,20000,0,1);
+			var flatness  = \db.asSpec.unmap(msg[21]);
+			var loudness  = \db.asSpec.unmap(msg[22]);
+			var data      = [pitch, conf, mfcc, centroid, rolloff, flatness, loudness].flat;
 			mlpMedianFilt = mlpMedianFilt.rotate(1).put(0,data);
-			data = mlpMedianFilt.flop.collect({ |i| i.median });
+			data          = mlpMedianFilt.flop.collect({ |i| i.median });
 
 			analyBuffer.setn(0,data)
 
@@ -472,17 +470,17 @@ MKQTPlay {
 		}).play;
 
 		OSCdef(\visualAnalysis,{ |msg|
-			var pitch    = msg[3].explin(20,20000,0,1);
-			var conf     = msg[4];
-			var mfcc     = msg[5..17].linlin(-250,250,0,1);
-			var centroid = msg[18].explin(20,20000,0,1);
-			var spread   = msg[19].explin(20,20000,0,1);
-			var rolloff  = msg[20].explin(20,20000,0,1);
-			var flatness = \db.asSpec.unmap(msg[21]);
-			var loudness = \db.asSpec.unmap(msg[22]);
-			var time = msg[23];
+			var pitch     = msg[3].explin(20,20000,0,1);
+			var conf      = msg[4];
+			var mfcc      = msg[5..17].linlin(-250,250,0,1);
+			var centroid  = msg[18].explin(20,20000,0,1);
+			var spread    = msg[19].explin(20,20000,0,1);
+			var rolloff   = msg[20].explin(20,20000,0,1);
+			var flatness  = \db.asSpec.unmap(msg[21]);
+			var loudness  = \db.asSpec.unmap(msg[22]);
+			var time      = msg[23];
 
-			var data = [pitch, conf, mfcc, centroid, rolloff, flatness, loudness, time].flat;
+			var data      = [pitch, conf, mfcc, centroid, rolloff, flatness, loudness, time].flat;
 
 			visMedianFilt = visMedianFilt.rotate(1).put(0,data);
 			// data = visMedianFilt.flop.collect({ |i| i.median });

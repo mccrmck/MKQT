@@ -1,6 +1,6 @@
-MKQT2 {
+MKQTv2 {
 
-	classvar <analysisFunc;
+	classvar <analysisFunc, <oscAnalyParseFunc;
 	classvar <guiAddr;
 	var	server;
 
@@ -17,12 +17,14 @@ MKQT2 {
 					var mfcc     = FluidMFCC.kr(sig,13,40,1,); // 13 coeffs
 					var spectrum = FluidSpectralShape.kr(sig,['centroid', 'spread', 'rolloff', 'flatness']); // centroid, spread, rolloff, flatness
 					var loudness = FluidLoudness.kr(sig,[\loudness]); // loudness
-
-					var info = [pitch, mfcc, spectrum, loudness].flat;
+					var time = Sweep.ar;
+					var info = [pitch, mfcc, spectrum, loudness,time].flat;
 					SendReply.kr(Impulse.kr(\trigFreq.kr(0)),oscKey,info);
 					in
 				}
 			};
+
+			// oscAnalyParseFunc { |oscMsg| }
 		})
 	}
 
@@ -34,29 +36,25 @@ MKQT2 {
 		server = Server.default;
 		this.openStageControl;
 		this.guiOSCdefs
-
 	}
 
 	openStageControl {
 		var unixString = "open /Applications/open-stage-control.app --args " ++
 		"--send 127.0.0.1:% ".format( NetAddr.localAddr.port ) ++
-		"--load '%'".format("/Users/mikemccormick/Library/Application Support/SuperCollider/Extensions/MKQT/main.json");                                   // this path needs to eventually be sorted out...
+		"--load '%'".format(Platform.userExtensionDir +/+ "/MKQT/main.json");
 
 		unixString.unixCmd
 	}
 }
 
-
 MKQTTrain {
 
-	// these variables seem very chaotic!! FIX
 	var <mlp;
 	var analyDataSet, synthDataSet;
 	var analyBuffer, synthBuffer;
-	var dataArray;
-	var server, <mixer;
-	var <pbSynth;
-	var pointID;
+	var analyArray;
+	var server, pointID;
+	var <mixer, <pbSynth;
 	var fxRoutine, fxSendBus;
 
 	*initClass {}
@@ -72,12 +70,12 @@ MKQTTrain {
 		server.quit;
 		server.waitForBoot({
 
-			mlp          = FluidMLPRegressor(server, [15,12], FluidMLPRegressor.relu, FluidMLPRegressor.relu,learnRate: 0.01);  // fix layer structure...?
+			mlp          = FluidMLPRegressor(server, [15,12], FluidMLPRegressor.relu, FluidMLPRegressor.relu,learnRate: 0.01);
 			analyDataSet = FluidDataSet(server);
 			synthDataSet = FluidDataSet(server);
 			analyBuffer  = Buffer.alloc(server,19);
 			synthBuffer  = Buffer.alloc(server,10);
-			dataArray    = Array.fill(19,{0});
+			analyArray   = Array.fill(19,{0});
 		});
 	}
 
@@ -91,7 +89,7 @@ MKQTTrain {
 			},{
 				mixer['playback'].addPreFaderSend('fx',fxSendBus,{ |sendSynth|
 					sendSynth.set(\amp,1);
-					mixer.addInsert('analyzer',MKQT2.analysisFunc.('/analysis'),{ action.value })
+					mixer.addInsert('analyzer',MKQTv2.analysisFunc.('/analysis'),{ action.value })
 				})
 			})
 		});
@@ -130,16 +128,13 @@ MKQTTrain {
 				var array = Array.fill(10,{1.0.rand});
 				(array[6] + array[7]).linlin(0,1,0.01,8).wait;
 				synthBuffer.setn(0,array);
-				analyBuffer.setn(0,dataArray);
+				analyBuffer.setn(0,analyArray);
 				MKQTSynth(fxSendBus, mixer.mixerBus, mixer.sendGroups[0], *array)
 			}
-
 		}.play
 	}
 
-	stopFXsynths {
-		fxRoutine.stop
-	}
+	stopFXsynths { fxRoutine.stop }
 
 	startAnalysis {
 
@@ -155,7 +150,7 @@ MKQTTrain {
 
 			var data = [pitch, conf, mfcc, centroid, rolloff, flatness, loudness].flat;
 
-			dataArray = data;
+			analyArray = data;
 
 		},'/analysis');
 	}
@@ -169,9 +164,7 @@ MKQTTrain {
 		synthDataSet.dump;
 	}
 
-	train {
-		mlp.fit(analyDataSet,synthDataSet,{ |loss| "loss: %".format(loss).postln })
-	}
+	train { mlp.fit(analyDataSet,synthDataSet,{ |loss| "loss: %".format(loss).postln }) }
 
 	saveDataSets { |path|
 		var date = Date.getDate.stamp;
@@ -180,8 +173,8 @@ MKQTTrain {
 
 		analyDataSet.write(pathName.pathOnly +/+ date ++ fileName ++ "_analyDS.json");
 		synthDataSet.write(pathName.pathOnly +/+ date ++ fileName ++ "_synthDS.json");
-		"%_analysisDS.json saved".format(fileName);
-		"%_synthDS.json saved".format(fileName);
+		"%_analysisDS.json saved".format(fileName).postln;
+		"%_synthDS.json saved".format(fileName).postln;
 	}
 
 	saveMlp { |path|
@@ -190,12 +183,10 @@ MKQTTrain {
 		var pathName = PathName(path).pathOnly;
 
 		mlp.write(pathName +/+ date ++ fileName);
-		"mlp: % saved".format(fileName)
+		"mlp: % saved".format(fileName).postln
 	}
 
-	clearMixer {
-		mixer.free
-	}
+	clearMixer { mixer.free }
 }
 
 
@@ -204,15 +195,17 @@ MKQTPlay {
 	// clean all this up, it's disgusting!
 
 	var <>janBus, <>floBus, <>karlBus, <>outBus;
-	var janSendBus, floSendBus, karlSendBus;
 	var <mlps, <analyBuffer, <synthBuffer, visualBuffer;
+	var <>coinProb, sendBusses;
 
+	var <mixer;
 	var <eqBusses, <compCrossO, <compBusses;
 
-	var	server, mlpMedianFilt, visualMedianFilt;
-	var <mixer, visuals;
+	var	server, mlpMedianFilt, visMedianFilt;
+	var trigDelta;
+	var visualLoop, <>visBool = true, <>visualIP, <>visualPort;
 
-	*new { |janIn, floIn, karlIn, out|                            // gotta ensure these get turned into arrays from o-s-c
+	*new { |janIn, floIn, karlIn, out|
 		^super.newCopyArgs(janIn, floIn, karlIn, out).init
 	}
 
@@ -225,10 +218,13 @@ MKQTPlay {
 			mlps         = ( jan: FluidMLPRegressor(server), flo: FluidMLPRegressor(server), karl: FluidMLPRegressor(server) );
 			analyBuffer  = Buffer.alloc(server,19);
 			synthBuffer  = Buffer.alloc(server,10);
-			visualBuffer = Buffer.alloc(server,19);
+			visualBuffer = Buffer.alloc(server,20);
 
-			mlpMedianFilt = Array.fill(15,{ 0 });       //  / 30 for time in seconds
-			visualMedianFilt  = Array.fill(15,{ 0 });   //  / 30 for time in seconds
+			mlpMedianFilt = Array.fill(15,{ 0 });   //  / 30 for time in seconds
+			visMedianFilt = Array.fill(5,{ 0 });   //  / 20 for time in seconds
+
+			coinProb = 0.1;
+			trigDelta = ( jan: 0, flo: 0, karl: 0 );
 
 			eqBusses = (
 				freq:  Bus.control(server,5).setn([40,160,640,1280,5120]),
@@ -248,26 +244,27 @@ MKQTPlay {
 		})
 	}
 
-	startPerformance { |waitForStart|
-		var waitTime = waitForStart ? 0;
-
-		Routine{
-			waitTime.wait;
-			this.startAnalysis;
-			this.loadPredictOSCdefs;
-		}.play
+	startPerformance {
+		this.startAnalysis;
+		this.loadPredictOSCdefs;
+		visualIP = visualIP ?? { "IP not supplied, using IP: 192.168.0.132".warn; "192.168.0.132" };
+		visualPort = visualPort ?? { "port not supplied, using port: 9000".warn; 9000 };
+		if(visBool,{ this.startOSCVisuals(visualIP,visualPort,1/20) });
 	}
 
 	stopPerformance {
 		this.stopAnalysis;
 		this.freePredictOSCdefs;
+		if(visBool,{ this.stopOSCVisuals });
 	}
 
 	makeMixer {
 		var cond = CondVar();
-		janSendBus  = Bus.audio(server,2);
-		floSendBus  = Bus.audio(server,2);
-		karlSendBus = Bus.audio(server,2);
+		sendBusses = (
+			jan: Bus.audio(server,2),
+			flo: Bus.audio(server,2),
+			karl: Bus.audio(server,2),
+		);
 
 		fork {
 			var run = 0;
@@ -275,7 +272,7 @@ MKQTPlay {
 			cond.wait { mixer.fader.notNil };
 			this.addSendStrips({ run = run + 1; cond.signalOne });
 			cond.wait{ run == 3 };
-			run = 0;
+			run = 0; ".\n".postln;
 			this.addSends({ run = run + 1; cond.signalOne });
 			cond.wait{ run == 3 };
 			run = 0;
@@ -285,20 +282,17 @@ MKQTPlay {
 			this.addMixerInserts({ run = run + 1; cond.signalOne });
 			cond.wait{ run == 2 };
 			run = 0;
-			this.loadMLPs;
+			this.loadMLPs({ run = run + 1; cond.signalOne });
+			cond.wait{ run == 3 };
+			"\nπ∆∞m∫ loaded".postln;
 		};
 	}
 
-	order {
-		// ensure MKQTSynths are going to the right place!
-		// ensure that setting \trigFreq is being directed at the right synths!
-	}
-
 	addSendStrips {|action|
-		mixer.addSendStrip('analyzer',MKQT2.analysisFunc.('/analysis'),{                 // global analyzer - depth 1
-			mixer.addSendStrip('visualizer',MKQT2.analysisFunc.('/visuals'),{            // fx analyzer for visuals - depth 1
+		mixer.addSendStrip('analyzer',MKQTv2.analysisFunc.('/analysis'),{                // global analyzer - depth 1
+			mixer.addSendStrip('visualizer',MKQTv2.analysisFunc.('/visuals'),{           // fx analyzer for visuals - depth 1
 				mixer.strips.keysDo({ |key|                                              // fxStrips(3) for each mixerStrip - depth 0
-					mixer.addSendStrip("%FX".format(key).asSymbol,{ |in| in /* dummy */ },{
+					mixer.addSendStrip("%FX".format(key).asSymbol,{ |in| in },{ |inSynth|
 						action.value;
 					},0);
 				});
@@ -308,10 +302,10 @@ MKQTPlay {
 
 	addSends { |action|
 		mixer.strips.keysDo({ |key|
-			mixer[key].addPreFaderSend("%Analy".format(key).asSymbol,mixer.sends['analyzer'].stripBus,{ |analySend|                                          // preFSend(3) inSynth -> global Analyzer
+			mixer[key].addPreFaderSend("%Analy".format(key).asSymbol,mixer.sends['analyzer'].stripBus,{ |analySend|       // preFSend(3) inSynth -> global Analyzer
 				var fxKey = "%FX".format(key).asSymbol;
 				analySend.set(\amp,1);
-				mixer[key].addPreFaderSend(fxKey, mixer.sends[fxKey].stripBus,{ |fxSend|                           // preFSend(3) inSynth -> fx Strip
+				mixer[key].addPreFaderSend(fxKey,sendBusses[key],{ |fxSend|                           // preFSend(3) inSynth -> fx Strip
 					fxSend.set(\amp,1);
 					mixer.sends[fxKey].addPreFaderSend("%Visual".format(key).asSymbol,mixer.sends['visualizer'].stripBus,{ |visualSend| // preFSend(3) fx -> visuals
 						visualSend.set(\amp,1);
@@ -326,19 +320,23 @@ MKQTPlay {
 		mixer.strips.keysDo({ |key|
 			var triggerKey = "%Trigger".format(key).asSymbol;
 			mixer[key].addInsert(triggerKey,this.prTriggerSynth(triggerKey),{
-				var inBus = (jan: janBus, flo: floBus, karl: karlBus);                    // this seems dumb, no?
+				var inFunc,inBus = (jan: janBus, flo: floBus, karl: karlBus);            // can this be better?
 				inBus = inBus[key];
-				if(inBus.isArray.not,{ inBus = inBus!2 });
-				mixer[key].addInSynth({ SoundIn.ar(\inBus.kr( inBus )) },{ action.value });
+				if(inBus.isArray.not,{
+					inFunc = { SoundIn.ar(\inBus.kr( inBus!2 )) }
+				},{
+					inFunc = { SoundIn.ar(\inBus.kr( inBus )) * -14.dbamp }           // scaling down karl to match mixer, also to make \thresholds sensible
+				});
+				mixer[key].addInSynth( inFunc ,{ action.value });
 			});
 		});
 	}
 
 	prTriggerSynth { |key|
 		^{ |in|
-			var onsets = FluidOnsetSlice.ar(in.sum,9,\onsetThresh.kr(0.5));
+			var onsets = FluidOnsetSlice.ar(HPF.ar(in.sum,160),9,\onsetThresh.kr(0.5));
 			var novelty = FluidNoveltySlice.ar(in.sum,1,31,\noveltyThresh.kr(0.33));   // what does this even mean? How to calibrate?
-			SendReply.ar(onsets + novelty,"/%".format(key).asSymbol,[onsets]);
+			SendReply.ar(onsets + novelty,"/%".format(key).asSymbol,[onsets,novelty]);
 			in
 		}
 	}
@@ -397,12 +395,12 @@ MKQTPlay {
 		mixer.free
 	}
 
-	loadMLPs {
-		var path = "/Users/mikemccormick/Library/Application Support/SuperCollider/Extensions/MKQT/MLPs/";                // fix this
+	loadMLPs { |action|
+		var path = Platform.userExtensionDir +/+ "/MKQT/MLPs/";
 
-		['jan','flo','karl'].do({ |key,index|
+		mixer.strips.keysDo({ |key,index|
 
-			mlps[key].read(path ++ "/%.json".format(key),{ "MLP: % loaded".format(key).postln });
+			mlps[key].read(path ++ "/%.json".format(key),{ action.value });
 		})
 	}
 
@@ -424,52 +422,51 @@ MKQTPlay {
 
 		},'/analysis');
 
-		mixer.sends['analyzer'].inserts['analyzer'].set(\trigFreq,30)
+		mixer.sends['analyzer'].inSynth.set(\trigFreq,30)
 	}
 
 	stopAnalysis {
 		OSCdef(\parseAnalysis).free;
-		mixer.sends['analyzer'].inserts['analyzer'].set(\trigFreq,0)
+		mixer.sends['analyzer'].inSynth.set(\trigFreq,0)
 	}
 
 	loadPredictOSCdefs {
 
-		['jan','flo','karl'].do({ |key,index|
-			var sendBus = [janSendBus,floSendBus,karlSendBus][index];
-
+		mixer.strips.keysDo({ |key|
 			OSCdef("%Trigger".format(key).asSymbol,{ |msg|
+				var delta, now = Main.elapsedTime;
 
-				if( 0.2.coin,{
-					mlps[key].predictPoint(analyBuffer,synthBuffer,{
-						synthBuffer.getn(0,10,action:{ |array|
-							// "%: %".format(key,array).postln;
-							MKQTSynth(sendBus,mixer.sends["%FX".format(key).asSymbol].stripBus,mixer.sends["%FX".format(key).asSymbol].inGroup,*array)
+				// this is to hopefully prevent triggers happening to close to eachother (dvs. scsynth crashes)
+				if(trigDelta[key] == 0,{ trigDelta[key] = now });
+				delta = now - trigDelta[key];
+				trigDelta[key] = now;
+
+				if( delta > 0.1,{
+					if( coinProb.coin,{
+						mlps[key].predictPoint(analyBuffer,synthBuffer,{
+							synthBuffer.getn(0,10,action:{ |array|
+								MKQTSynth(sendBusses[key],mixer.sends["%FX".format(key).asSymbol].stripBus,mixer.sends["%FX".format(key).asSymbol].inGroup,*array)
+							});
 						});
 					});
 				});
-
 			},"/%Trigger".format(key).asSymbol)
 		})
 	}
 
 	freePredictOSCdefs {
 		['jan','flo','karl'].do({ |key,index|
-
 			OSCdef("%Trigger".format(key).asSymbol).free
 		})
 	}
 
 	startOSCVisuals { |ip, port, delta = 0.1|
 		var addr = NetAddr(ip,port);
-		var local = NetAddr.localAddr;
-		visuals = Routine({
+		visualLoop = Routine({
 			loop{
 				delta.wait;
-				analyBuffer.getn(0,19,{ |array|
-					array = array * 0.2;                  // scaled down to suit the visual speed
+				visualBuffer.getn(0,20,{ |array|
 					addr.sendMsg("/mkqt",*array);
-					local.sendMsg("/write",*array)
-
 				})
 			}
 		}).play;
@@ -483,18 +480,23 @@ MKQTPlay {
 			var rolloff  = msg[20].explin(20,20000,0,1);
 			var flatness = \db.asSpec.unmap(msg[21]);
 			var loudness = \db.asSpec.unmap(msg[22]);
-			var data = [pitch, conf, mfcc, centroid, rolloff, flatness, loudness].flat;
+			var time = msg[23];
 
-			visualMedianFilt = visualMedianFilt.rotate(1).put(0,data);
-			data = visualMedianFilt.flop.collect({ |i| i.median });
+			var data = [pitch, conf, mfcc, centroid, rolloff, flatness, loudness, time].flat;
+
+			visMedianFilt = visMedianFilt.rotate(1).put(0,data);
+			// data = visMedianFilt.flop.collect({ |i| i.median });
 
 			visualBuffer.setn(0,data)
 
 		},'/visuals');
+
+		mixer.sends['visualizer'].inSynth.set(\trigFreq,20)
 	}
 
 	stopOSCVisuals {
-		visuals.stop;
+		visualLoop.stop;
 		OSCdef(\visualAnalysis).free;
+		mixer.sends['visualizer'].inSynth.set(\trigFreq,0)
 	}
 }

@@ -116,11 +116,13 @@ MKQTSynth {
 		var mod = {
 			var modFreq = \modFreq.kr(0.5).linexp(0,1,0.5,12);
 			var synthArray = [
-				SinOsc.ar(modFreq).range(0.5,1),
-				LFNoise0.ar(modFreq).range(0.5,1),
-				LFNoise1.ar(modFreq).range(0.5,1),
 				1,
-				LFSaw.ar(modFreq).range(0.5,1)
+				LFNoise0.ar(modFreq).range(0.9,1),
+				LFNoise0.ar(modFreq / 2).range(0.45,0.5),
+				// LFNoise1.ar(modFreq).range(0.9,1),
+				Line.ar(0.5,1,10),
+				1,
+				// LFSaw.ar(modFreq).range(0.9,1)
 			];
 			Select.kr(\modIndex.kr(0).linlin(0,1,0,synthArray.size).floor,synthArray)
 		};
@@ -148,7 +150,7 @@ MKQTSynth {
 					var lfo = mod.value;
 					sig = preFunc.value(sig);
 					sig = postFunc.value(sig, lfo );
-					sig = Squish.ar(sig,sig,-18,0.03,0.1,4,0,6).tanh;
+					sig = Squish.ar(sig,sig,-18,0.03,0.1,4,0,0).tanh;
 					sig = LeakDC.ar(sig);
 
 					sig = sig * env.value;

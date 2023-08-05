@@ -231,12 +231,12 @@ MKQTPlay {
 			);
 			compCrossO = Bus.control(server,3).setn([150,550,3000]);
 			compBusses = (
-				thresh: Bus.control(server,4).setn(0.dbamp!4),
+				thresh: Bus.control(server,4).setn(1!4),
 				atk:    Bus.control(server,4).setn(0.01!4),
 				rls:    Bus.control(server,4).setn(0.01!4),
 				ratio:  Bus.control(server,4).setn(4!4),
 				knee:   Bus.control(server,4).setn(0!4),
-				muGain: Bus.control(server,4).setn(0.dbamp!4),
+				muGain: Bus.control(server,4).setn(0!4),
 			);
 			this.makeMixer
 		})
@@ -245,22 +245,18 @@ MKQTPlay {
 	startPerformance {
 		this.startAnalysis;
 		this.loadPredictOSCdefs;
-		visualIP = visualIP ?? { "IP not supplied, using IP: 192.168.0.132".warn; "192.168.0.132" };
-		visualPort = visualPort ?? { "port not supplied, using port: 9000".warn; 9000 };
-		if(visBool,{ this.startOSCVisuals(visualIP,visualPort,1/20) });
 	}
 
 	stopPerformance {
 		this.stopAnalysis;
 		this.freePredictOSCdefs;
-		if(visBool,{ this.stopOSCVisuals });
 	}
 
 	makeMixer {
 		var cond   = CondVar();
 		sendBusses = (
-			jan: Bus.audio(server,2),
-			flo: Bus.audio(server,2),
+			jan:  Bus.audio(server,2),
+			flo:  Bus.audio(server,2),
 			karl: Bus.audio(server,2),
 		);
 
@@ -321,9 +317,9 @@ MKQTPlay {
 				var inFunc,inBus = (jan: janBus, flo: floBus, karl: karlBus);            // can this be better?
 				inBus = inBus[key];
 				if(inBus.isArray.not,{
-					inFunc = { SoundIn.ar(\inBus.kr( inBus!2 )) }
+					inFunc = { SoundIn.ar(\inBus.kr( inBus!2 )).tanh }
 				},{
-					inFunc = { SoundIn.ar(\inBus.kr( inBus )) * -14.dbamp }           // scaling down karl to match mixer, also to make \thresholds sensible
+					inFunc = { SoundIn.ar(\inBus.kr( inBus ),-14.dbamp ).tanh }           // scaling down karl to match mixer, also to make \thresholds sensible
 				});
 				mixer[key].addInSynth( inFunc ,{ action.value });
 			});
@@ -396,8 +392,7 @@ MKQTPlay {
 	loadMLPs { |action|
 		var path = Platform.userExtensionDir +/+ "/MKQT/MLPs/";
 
-		mixer.strips.keysDo({ |key,index|
-
+		mixer.strips.keysDo({ |key|
 			mlps[key].read(path ++ "/%.json".format(key),{ action.value });
 		})
 	}
@@ -405,7 +400,7 @@ MKQTPlay {
 	startAnalysis {
 		OSCdef(\parseAnalysis,{ |msg|
 			var pitch     = msg[3].explin(20,20000,0,1);
-			var conf      = msg[4];
+			var conf      = msg[4].clip(0,1);
 			var mfcc      = msg[5..17].linlin(-250,250,0,1);
 			var centroid  = msg[18].explin(20,20000,0,1);
 			var spread    = msg[19].explin(20,20000,0,1);
@@ -434,13 +429,13 @@ MKQTPlay {
 			OSCdef("%Trigger".format(key).asSymbol,{ |msg|
 				var delta, now = Main.elapsedTime;
 
-				// this is to hopefully prevent triggers happening to close to eachother (dvs. scsynth crashes)
 				if(trigDelta[key] == 0,{ trigDelta[key] = now });
 				delta = now - trigDelta[key];
 				trigDelta[key] = now;
 
-				if( delta > 0.1,{
+				if( delta > 0.2,{
 					if( coinProb.coin,{
+						// "%: %".format(key,delta).postln;
 						mlps[key].predictPoint(analyBuffer,synthBuffer,{
 							synthBuffer.getn(0,10,action:{ |array|
 								MKQTSynth(sendBusses[key],mixer.sends["%FX".format(key).asSymbol].stripBus,mixer.sends["%FX".format(key).asSymbol].inGroup,*array)
@@ -453,7 +448,7 @@ MKQTPlay {
 	}
 
 	freePredictOSCdefs {
-		['jan','flo','karl'].do({ |key,index|
+		mixer.strips.keysDo({ |key|
 			OSCdef("%Trigger".format(key).asSymbol).free
 		})
 	}

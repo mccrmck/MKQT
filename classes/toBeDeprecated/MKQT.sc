@@ -41,7 +41,7 @@ MKQT {
 
 		// should I clear synthLib and classifiers?
 
-		synthLookup = thisProcess.interpreter.executeFile(path +/+ "synthLookup.scd");
+		synthLookup = Platform.userExtensionDir +/+ "old/synthLookup.scd";
 	}
 
 	/* ==== data collection ==== */

@@ -142,6 +142,7 @@
 
 	*playOSCdefs { |instance|
 		var play = instance;
+		var ipAddr, portNum;
 
 		/* ======= calibration ======= */
 
@@ -263,7 +264,7 @@
 		OSCdef(\naomiActivity,{ |msg|
 			var val = msg[1];
 			val = val * 0.2;
-			play.coinProb = val
+			play.coinProb = val;
 		},'/naomiActivity');
 
 		OSCdef(\mainAmp,{ |msg|
@@ -359,7 +360,20 @@
 
 		OSCdef(\startNaomi,{ |msg|
 			var val = msg[1];
-			if(val == 1,{ play.startPerformance },{ play.stopPerformance })
+			if(val == 1,{
+
+				if(play.visBool,{
+					ipAddr = play.visualIP ?? { "IP not supplied, using IP: 192.168.0.132".warn; "192.168.0.132" };
+					portNum = play.visualPort ?? { "port not supplied, using port: 9000".warn; 9000 };
+					play.startOSCVisuals(ipAddr,portNum,1/20)
+				});
+
+				play.startPerformance
+
+			},{
+				if(play.visBool,{ play.stopOSCVisuals });
+				play.stopPerformance
+			})
 		},'/startNaomi');
 
 

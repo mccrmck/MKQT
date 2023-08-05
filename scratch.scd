@@ -29,7 +29,7 @@ m.stopPerformance;
 m.startOSCVisuals("192.168.0.132",9000,1/30);
 m.stopOSCVisuals
 
-
+MKQTGUI.startGUI
 
 // "reverse delay" effect -> more of that!
 // change after a certain amount of time...new MLP?!
@@ -52,4 +52,38 @@ m.stopOSCVisuals
 
 
 
-FluidAmpFeature.version(s)
+~mlp = FluidMLPRegressor(s).read("/Users/mikemccormick/Library/Application Support/SuperCollider/Extensions/MKQT/MLPs/flo.json")
+
+1/750
+
+
+OSCdef('test').clear
+
+(
+~src = Buffer.loadCollection(s,Array.rand(19,0,1.0));
+~targ = Buffer.loadCollection(s,Array.rand(10,0,1.0));
+x = { |delta|
+
+	fork{
+		loop{
+			~src.setn(0,Array.rand(10,0,1.0));
+
+			~mlp.predictPoint(~src,~targ,{
+				~targ.getn(0,10,action:{ |array|
+					array.postln
+				})
+			});
+			delta.wait;
+		}
+	}
+}
+)
+
+x.(0.05)
+x.stop
+
+
+
+b = Buffer.loadCollection(s,Array.fill(19, {1.0.rand} ))
+bench{ 100.do({b.getn(0,10,{|a|})}) }
+

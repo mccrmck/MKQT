@@ -88,7 +88,7 @@ MKQTTrain {
 			},{
 				mixer['playback'].addPreFaderSend('fx',fxSendBus,{ |sendSynth|
 					sendSynth.set(\amp,1);
-					mixer.addInsert('analyzer',MKQTv2.analysisFunc.('/analysis'),{ action.value })
+					mixer.addInsert('analyzer',MKQTv2.analysisFunc.('/analysis'),action:{ action.value })
 				})
 			})
 		});
@@ -313,7 +313,7 @@ MKQTPlay {
 	addInSynths { |action|
 		mixer.strips.keysDo({ |key|
 			var triggerKey = "%Trigger".format(key).asSymbol;
-			mixer[key].addInsert(triggerKey,this.prTriggerSynth(triggerKey),{
+			mixer[key].addInsert(triggerKey,this.prTriggerSynth(triggerKey),action:{
 				var inFunc,inBus = (jan: janBus, flo: floBus, karl: karlBus);            // can this be better?
 				inBus = inBus[key];
 				if(inBus.isArray.not,{
@@ -347,7 +347,7 @@ MKQTPlay {
 				sig = BPeakEQ.ar(sig,cutoffs[i].clip(20,20000),rqs[i].linlin(0,1,2.sqrt,0.01),dBs[i].clip(-24,24))
 			});
 			sig
-		},{ |insertSynth|
+		},action:{ |insertSynth|
 			insertSynth.set(
 				\freqs,   eqBusses['freq'],
 				\res,     eqBusses['rq'],
@@ -371,7 +371,7 @@ MKQTPlay {
 				Squish.ar(band,band,thresh[i],atk[i],rls[i],ratio[i],knee[i],muGain[i]).tanh;
 			});
 			sig.sum
-		},{ |insertSynth|
+		},action:{ |insertSynth|
 			insertSynth.set(
 				\crossO, compCrossO,
 				\thresh, compBusses['thresh'],
